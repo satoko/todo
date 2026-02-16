@@ -167,7 +167,7 @@ body.history-mode {
 .add-todo-fab {
   position: fixed;
   right: 18px;
-  bottom: calc(18px + env(safe-area-inset-bottom));
+  bottom: calc(92px + env(safe-area-inset-bottom));
   width: 58px;
   height: 58px;
   border-radius: 999px;
