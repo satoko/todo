@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; object-src 'none'; base-uri 'none'; form-action 'self'"
+    />
+    <title>Simple Todo</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="top-bar">
+        <div class="view-switch">
+          <button id="show-todo-btn" class="small-btn active" type="button">Todo</button>
+          <button id="show-history-btn" class="small-btn" type="button">History</button>
+        </div>
+        <div class="top-actions">
+          <button id="move-history-btn" class="primary-btn" type="button">Move to History</button>
+          <button id="history-prune-btn" class="small-btn" type="button">指定日付以前を削除</button>
+          <button id="reload-btn" class="small-btn" type="button">Reload</button>
+          <button id="settings-btn" class="small-btn" type="button">設定</button>
+        </div>
+      </header>
+
+      <section id="todo-view" class="view todo-view">
+        <ul id="todo-list" class="item-list"></ul>
+      </section>
+
+      <section id="history-view" class="view history-view hidden">
+        <ul id="history-list" class="item-list history"></ul>
+      </section>
+    </main>
+
+    <form id="todo-form" class="bottom-input-bar">
+      <input
+        id="todo-input"
+        type="text"
+        placeholder="やることを入力"
+        autocomplete="off"
+        required
+      />
+      <button type="submit">追加</button>
+    </form>
+
+    <dialog id="settings-dialog" class="settings-dialog">
+      <form id="settings-form" method="dialog" class="settings-content">
+        <section class="settings-section">
+          <p>壁紙を設定</p>
+          <input id="wallpaper-input" type="file" accept="image/*" />
+        </section>
+
+        <section class="settings-section">
+          <p>データ管理</p>
+          <div class="settings-actions settings-inline">
+            <button id="export-json-btn" type="button" class="small-btn">Export JSON</button>
+            <button id="import-json-btn" type="button" class="small-btn">Import JSON</button>
+          </div>
+          <input id="import-json-input" type="file" accept="application/json,.json" class="hidden" />
+          <small class="format-note">形式: { "version": 1, "todos": [...], "history": [...] }</small>
+        </section>
+
+        <div class="settings-actions">
+          <button id="clear-wallpaper-btn" type="button" class="small-btn">解除</button>
+          <button type="submit" class="small-btn">閉じる</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="history-delete-dialog" class="settings-dialog">
+      <form id="history-delete-form" class="settings-content" method="dialog">
+        <p>指定日付以前の履歴を削除</p>
+        <input id="history-cutoff-input" type="text" inputmode="numeric" placeholder="YYYYMMDD 例: 20260131" />
+        <div class="settings-actions">
+          <button id="history-delete-cancel-btn" type="button" class="small-btn">キャンセル</button>
+          <button id="history-delete-before-btn" type="submit" class="small-btn">削除</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
