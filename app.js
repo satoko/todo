@@ -2,6 +2,9 @@ const form = document.querySelector("#todo-form");
 const input = document.querySelector("#todo-input");
 const todoList = document.querySelector("#todo-list");
 const historyList = document.querySelector("#history-list");
+const addTodoFab = document.querySelector("#add-todo-fab");
+const addTodoDialog = document.querySelector("#add-todo-dialog");
+const closeAddTodoBtn = document.querySelector("#close-add-todo-btn");
 
 const todoView = document.querySelector("#todo-view");
 const historyView = document.querySelector("#history-view");
@@ -48,6 +51,10 @@ function setView(mode) {
   showHistoryBtn.classList.toggle("active", !isTodo);
   moveHistoryBtn.classList.toggle("hidden", !isTodo);
   historyPruneBtn.classList.toggle("hidden", isTodo);
+  addTodoFab.classList.toggle("hidden", !isTodo);
+  if (!isTodo && addTodoDialog.open) {
+    addTodoDialog.close();
+  }
   document.body.classList.toggle("history-mode", !isTodo);
 }
 
@@ -145,7 +152,6 @@ function installEdgeHistorySwipe() {
 
   function onPointerDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (historyView.classList.contains("hidden") === false) return;
     if (e.target.closest("input, button, dialog, .swipe-item")) return;
     if (e.clientX > HISTORY_EDGE_START) return;
     tracking = true;
@@ -159,7 +165,8 @@ function installEdgeHistorySwipe() {
     const deltaX = e.clientX - startX;
     const deltaY = e.clientY - startY;
     if (deltaX > HISTORY_EDGE_TRIGGER && Math.abs(deltaX) > Math.abs(deltaY)) {
-      setView("history");
+      const isTodo = historyView.classList.contains("hidden");
+      setView(isTodo ? "history" : "todo");
     }
   }
 
@@ -250,7 +257,7 @@ function render() {
   }
 
   if (state.history.length === 0) {
-    renderEmpty(historyList, "Historyはありません");
+    renderEmpty(historyList, "履歴はありません");
   } else {
     state.history.forEach((item) => {
       historyList.append(createHistoryItem(item));
@@ -419,9 +426,20 @@ form.addEventListener("submit", (e) => {
 
   state.todos.push({ text, done: false });
   input.value = "";
-  input.focus();
   render();
   saveState();
+  addTodoDialog.close();
+});
+
+addTodoFab.addEventListener("click", () => {
+  if (typeof addTodoDialog.showModal === "function") {
+    addTodoDialog.showModal();
+    input.focus();
+  }
+});
+
+closeAddTodoBtn.addEventListener("click", () => {
+  addTodoDialog.close();
 });
 
 showTodoBtn.addEventListener("click", () => setView("todo"));

@@ -16,10 +16,10 @@
       <header class="top-bar">
         <div class="view-switch">
           <button id="show-todo-btn" class="small-btn active" type="button">Todo</button>
-          <button id="show-history-btn" class="small-btn" type="button">History</button>
+          <button id="show-history-btn" class="small-btn" type="button">履歴</button>
         </div>
         <div class="top-actions">
-          <button id="move-history-btn" class="primary-btn" type="button">Move to History</button>
+          <button id="move-history-btn" class="primary-btn" type="button">履歴へ移動</button>
           <button id="history-prune-btn" class="small-btn" type="button">指定日付以前を削除</button>
           <button id="reload-btn" class="small-btn" type="button">Reload</button>
           <button id="settings-btn" class="small-btn" type="button">設定</button>
@@ -35,16 +35,23 @@
       </section>
     </main>
 
-    <form id="todo-form" class="bottom-input-bar">
-      <input
-        id="todo-input"
-        type="text"
-        placeholder="やることを入力"
-        autocomplete="off"
-        required
-      />
-      <button type="submit">追加</button>
-    </form>
+    <button id="add-todo-fab" class="add-todo-fab" type="button" aria-label="Todoを追加">+</button>
+
+    <dialog id="add-todo-dialog" class="add-todo-dialog">
+      <form id="todo-form" class="add-todo-form" method="dialog">
+        <input
+          id="todo-input"
+          type="text"
+          placeholder="やることを入力"
+          autocomplete="off"
+          required
+        />
+        <div class="add-todo-actions">
+          <button id="close-add-todo-btn" type="button" class="small-btn">閉じる</button>
+          <button type="submit" class="primary-btn">追加</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="settings-dialog" class="settings-dialog">
       <form id="settings-form" method="dialog" class="settings-content">

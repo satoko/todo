@@ -3,7 +3,7 @@
   --surface: rgba(255, 255, 255, 0.9);
   --text: #1f2937;
   --line: #d0d5dd;
-  --primary: #2563eb;
+  --primary: #4682b4;
   --danger: #b42318;
 }
 
@@ -21,7 +21,7 @@ body {
 
 .app-shell {
   min-height: 100vh;
-  padding: 14px 14px 90px;
+  padding: 14px 14px 110px;
   max-width: 620px;
   margin: 0 auto;
 }
@@ -164,34 +164,57 @@ body.history-mode {
   padding: 18px 8px;
 }
 
-.bottom-input-bar {
+.add-todo-fab {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  gap: 8px;
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.95);
-  border-top: 1px solid #e4e7ec;
-  backdrop-filter: blur(6px);
+  right: 18px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(70, 130, 180, 0.35);
 }
 
-.bottom-input-bar input {
-  flex: 1;
+.add-todo-dialog {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.add-todo-dialog::backdrop {
+  background: rgba(15, 23, 42, 0.22);
+}
+
+.add-todo-form {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(86px + env(safe-area-inset-bottom));
+  display: grid;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid #d0d5dd;
+  border-radius: 14px;
+  padding: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.add-todo-form input {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 12px;
   font-size: 1rem;
 }
 
-.bottom-input-bar button {
-  border: none;
-  border-radius: 10px;
-  background: var(--primary);
-  color: #fff;
-  padding: 0 16px;
-  cursor: pointer;
+.add-todo-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .settings-dialog {
