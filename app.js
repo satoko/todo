@@ -33,7 +33,7 @@ const MAX_TODOS = 1000;
 const MAX_HISTORY = 3000;
 const MAX_IMPORT_SIZE = 1024 * 1024;
 const MAX_WALLPAPER_SIZE = 15 * 1024 * 1024;
-const DELETE_SWIPE_WIDTH = 86;
+const SWIPE_ACTIONS_WIDTH = 172;
 const RIGHT_EDGE_SWIPE_START = 56;
 const HISTORY_EDGE_START = 24;
 const HISTORY_EDGE_TRIGGER = 72;
@@ -141,10 +141,10 @@ function wireSwipe(content, onDelete) {
     if (Math.abs(deltaY) > Math.abs(delta)) return;
 
     if (delta < 0) {
-      setShift(Math.max(-DELETE_SWIPE_WIDTH, delta));
+      setShift(Math.max(-SWIPE_ACTIONS_WIDTH, delta));
     }
     if (delta > 0 && open) {
-      setShift(Math.min(0, -DELETE_SWIPE_WIDTH + delta));
+      setShift(Math.min(0, -SWIPE_ACTIONS_WIDTH + delta));
     }
   }
 
@@ -154,7 +154,7 @@ function wireSwipe(content, onDelete) {
     content.releasePointerCapture(e.pointerId);
 
     if (delta < -42) {
-      setShift(-DELETE_SWIPE_WIDTH);
+      setShift(-SWIPE_ACTIONS_WIDTH);
       open = true;
       return;
     }
@@ -178,7 +178,7 @@ function wireSwipe(content, onDelete) {
   return {
     close,
     open: () => {
-      setShift(-DELETE_SWIPE_WIDTH);
+      setShift(-SWIPE_ACTIONS_WIDTH);
       open = true;
     },
     remove: () => {
@@ -223,10 +223,23 @@ function createTodoItem(todo, index) {
   const li = document.createElement("li");
   li.className = "swipe-item";
 
+  const actions = document.createElement("div");
+  actions.className = "swipe-actions";
+
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "swipe-action edit";
+  editBtn.textContent = "編集";
+  editBtn.addEventListener("click", () => {
+    state.editingIndex = index;
+    render();
+  });
+
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
-  deleteBtn.className = "swipe-action";
+  deleteBtn.className = "swipe-action delete";
   deleteBtn.textContent = "削除";
+  actions.append(editBtn, deleteBtn);
 
   const content = document.createElement("div");
   content.className = "swipe-content";
@@ -286,22 +299,12 @@ function createTodoItem(todo, index) {
     text.className = `todo-text ${todo.done ? "done" : ""}`;
     text.textContent = todo.text;
 
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "edit-btn";
-    editBtn.textContent = "編集";
-    editBtn.addEventListener("click", () => {
-      state.editingIndex = index;
-      render();
-    });
-
     left.append(checkbox, text);
-    right.append(editBtn);
   }
 
   inner.append(left, right);
   content.append(inner);
-  li.append(deleteBtn, content);
+  li.append(actions, content);
 
   const swipe = wireSwipe(content, () => {
     state.todos.splice(index, 1);
