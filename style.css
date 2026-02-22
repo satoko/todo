@@ -155,6 +155,16 @@ body.history-mode .bg-layer {
 
 body.todo-dragging {
   user-select: none;
+  -webkit-user-select: none;
+}
+
+body.todo-drag-pending {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.todo-dragging .swipe-content {
+  touch-action: none;
 }
 
 .swipe-actions {

@@ -133,6 +133,7 @@ function wireSwipe(content, handlers) {
 
   function onPointerDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (activeTodoDragPointerId !== null || pendingTodoDragPointerId !== null) return;
     if (e.target.closest("input, button, label, a")) return;
     canSwipe = true;
     if (!canSwipe) return;
@@ -231,6 +232,7 @@ function installTodoReorder(li, content, stateIndex) {
   let startX = 0;
   let startY = 0;
   let lastClientY = 0;
+  let windowTracking = false;
   const fromVisualIndex = state.todos.length - 1 - stateIndex;
 
   function clearPressTimer() {
@@ -248,6 +250,23 @@ function installTodoReorder(li, content, stateIndex) {
     li.style.pointerEvents = "";
     li.classList.remove("dragging");
     document.body.classList.remove("todo-dragging");
+    document.body.classList.remove("todo-drag-pending");
+  }
+
+  function startWindowTracking() {
+    if (windowTracking) return;
+    windowTracking = true;
+    window.addEventListener("pointermove", onPointerMove, { passive: false });
+    window.addEventListener("pointerup", onPointerEnd);
+    window.addEventListener("pointercancel", onPointerCancel);
+  }
+
+  function stopWindowTracking() {
+    if (!windowTracking) return;
+    windowTracking = false;
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerEnd);
+    window.removeEventListener("pointercancel", onPointerCancel);
   }
 
   function maybeAutoScroll(clientY) {
@@ -286,6 +305,7 @@ function installTodoReorder(li, content, stateIndex) {
     dragActive = true;
     pendingTodoDragPointerId = null;
     activeTodoDragPointerId = pointerId;
+    document.body.classList.remove("todo-drag-pending");
     document.body.classList.add("todo-dragging");
     li.classList.add("dragging");
 
@@ -344,6 +364,8 @@ function installTodoReorder(li, content, stateIndex) {
 
   function cancelTracking() {
     clearPressTimer();
+    stopWindowTracking();
+    document.body.classList.remove("todo-drag-pending");
     pendingTodoDragPointerId = null;
     pointerId = null;
   }
@@ -354,9 +376,14 @@ function installTodoReorder(li, content, stateIndex) {
     if (e.target.closest("input, button, label, a")) return;
     pointerId = e.pointerId;
     pendingTodoDragPointerId = pointerId;
+    document.body.classList.add("todo-drag-pending");
     startX = e.clientX;
     startY = e.clientY;
     lastClientY = e.clientY;
+    startWindowTracking();
+    if (typeof content.setPointerCapture === "function") {
+      content.setPointerCapture(e.pointerId);
+    }
     pressTimerId = window.setTimeout(() => {
       startDrag(lastClientY);
     }, TODO_DRAG_LONG_PRESS_MS);
@@ -370,6 +397,7 @@ function installTodoReorder(li, content, stateIndex) {
       const dy = e.clientY - startY;
       if (Math.hypot(dx, dy) > TODO_DRAG_CANCEL_DISTANCE) {
         clearPressTimer();
+        document.body.classList.remove("todo-drag-pending");
         pendingTodoDragPointerId = null;
       }
       return;
@@ -390,6 +418,8 @@ function installTodoReorder(li, content, stateIndex) {
     if (content.hasPointerCapture(e.pointerId)) {
       content.releasePointerCapture(e.pointerId);
     }
+    stopWindowTracking();
+    document.body.classList.remove("todo-drag-pending");
     pointerId = null;
     pendingTodoDragPointerId = null;
   }
@@ -400,14 +430,13 @@ function installTodoReorder(li, content, stateIndex) {
     if (dragActive) {
       finishDrag();
     }
+    stopWindowTracking();
+    document.body.classList.remove("todo-drag-pending");
     pointerId = null;
     pendingTodoDragPointerId = null;
   }
 
   content.addEventListener("pointerdown", onPointerDown);
-  content.addEventListener("pointermove", onPointerMove);
-  content.addEventListener("pointerup", onPointerEnd);
-  content.addEventListener("pointercancel", onPointerCancel);
 
   li.addEventListener(
     "click",
@@ -428,6 +457,7 @@ function installEdgeHistorySwipe() {
 
   function onPointerDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (activeTodoDragPointerId !== null || pendingTodoDragPointerId !== null) return;
     if (e.target.closest("input, button, dialog")) return;
     if (e.clientX > HISTORY_EDGE_START) return;
     tracking = true;
@@ -437,6 +467,7 @@ function installEdgeHistorySwipe() {
 
   function onPointerUp(e) {
     if (!tracking) return;
+    if (activeTodoDragPointerId !== null || pendingTodoDragPointerId !== null) return;
     tracking = false;
     const deltaX = e.clientX - startX;
     const deltaY = e.clientY - startY;
