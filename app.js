@@ -315,7 +315,7 @@ function createTodoItem(todo, index) {
     left.addEventListener("click", (e) => {
       if (e.target.closest("input, button")) return;
       const rect = inner.getBoundingClientRect();
-      if (e.clientX <= rect.left + rect.width * 0.55) {
+      if (e.clientX <= rect.left + rect.width * 0.65) {
         checkbox.checked = !checkbox.checked;
         checkbox.dispatchEvent(new Event("change", { bubbles: true }));
       }
