@@ -16,9 +16,18 @@ body {
   margin: 0;
   min-height: 100vh;
   font-family: "Hiragino Sans", "Yu Gothic", sans-serif;
-  background: #f6f7fb center / cover no-repeat fixed;
+  background: #f6f7fb;
   color: var(--text);
   overflow: hidden;
+}
+
+.bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: #f6f7fb center / cover no-repeat fixed;
+  transform: translateZ(0);
 }
 
 .app-shell {
@@ -29,6 +38,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .top-bar {
@@ -109,7 +120,10 @@ body {
 
 body.history-mode {
   background: #e5e7eb !important;
-  background-image: none !important;
+}
+
+body.history-mode .bg-layer {
+  opacity: 0;
 }
 
 .item-list {

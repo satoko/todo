@@ -1,5 +1,6 @@
 const form = document.querySelector("#todo-form");
 const input = document.querySelector("#todo-input");
+const bgLayer = document.querySelector("#bg-layer");
 const todoList = document.querySelector("#todo-list");
 const historyList = document.querySelector("#history-list");
 const addTodoFab = document.querySelector("#add-todo-fab");
@@ -34,10 +35,10 @@ const MAX_HISTORY = 3000;
 const MAX_IMPORT_SIZE = 1024 * 1024;
 const MAX_WALLPAPER_SIZE = 15 * 1024 * 1024;
 const SWIPE_ACTIONS_WIDTH = 172;
-const TASK_ACTION_TRIGGER = 8;
-const HISTORY_EDGE_START = 220;
-const HISTORY_EDGE_TRIGGER = 18;
-const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 20;
+const TASK_ACTION_TRIGGER = 5;
+const HISTORY_EDGE_START = 10000;
+const HISTORY_EDGE_TRIGGER = 14;
+const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 12;
 
 const state = {
   todos: [],
@@ -139,7 +140,7 @@ function wireSwipe(content, handlers) {
     if (!canSwipe || !content.hasPointerCapture(e.pointerId)) return;
     const delta = e.clientX - startX;
     const deltaY = e.clientY - startY;
-    if (Math.abs(deltaY) > Math.abs(delta) * 2.6) return;
+    if (Math.abs(deltaY) > Math.abs(delta) * 3.5) return;
 
     if (delta < 0) {
       setShift(Math.max(-SWIPE_ACTIONS_WIDTH, delta));
@@ -161,7 +162,7 @@ function wireSwipe(content, handlers) {
       return;
     }
 
-    if (delta > 12 && open) {
+    if (delta > 8 && open) {
       close();
       canSwipe = false;
       return;
@@ -215,7 +216,7 @@ function installEdgeHistorySwipe() {
     tracking = false;
     const deltaX = e.clientX - startX;
     const deltaY = e.clientY - startY;
-    if (deltaX > HISTORY_EDGE_TRIGGER && Math.abs(deltaX) > Math.abs(deltaY) * 0.55) {
+    if (deltaX > HISTORY_EDGE_TRIGGER && Math.abs(deltaX) > Math.abs(deltaY) * 0.45) {
       const isTodo = historyView.classList.contains("hidden");
       setView(isTodo ? "history" : "todo");
     }
@@ -420,12 +421,16 @@ function moveCheckedToHistory() {
 
 function applyWallpaper(dataUrl) {
   if (!dataUrl) {
-    document.body.style.backgroundImage = "none";
+    if (bgLayer) {
+      bgLayer.style.backgroundImage = "none";
+    }
     localStorage.removeItem(STORAGE_KEY);
     return;
   }
 
-  document.body.style.backgroundImage = `url("${dataUrl}")`;
+  if (bgLayer) {
+    bgLayer.style.backgroundImage = `url("${dataUrl}")`;
+  }
   localStorage.setItem(STORAGE_KEY, dataUrl);
 }
 
