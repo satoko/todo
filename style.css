@@ -82,8 +82,8 @@ body {
 }
 
 .small-btn.active {
-  background: #111827;
-  border-color: #111827;
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 
