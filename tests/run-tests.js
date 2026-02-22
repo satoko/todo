@@ -45,6 +45,25 @@ const tests = [
     },
   },
   {
+    name: "move: Todoの順序を変更できる",
+    run() {
+      const state = createState();
+      state.todos = [
+        { text: "A", done: false },
+        { text: "B", done: false },
+        { text: "C", done: false },
+      ];
+      state.editingIndex = 1;
+      TodoCore.moveTodo(state, 2, 0);
+      assert.deepEqual(state.todos, [
+        { text: "C", done: false },
+        { text: "A", done: false },
+        { text: "B", done: false },
+      ]);
+      assert.equal(state.editingIndex, 2);
+    },
+  },
+  {
     name: "export: stateからpayloadを作成できる",
     run() {
       const state = createState();

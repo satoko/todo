@@ -38,6 +38,10 @@ const TASK_ACTION_TRIGGER = 5;
 const HISTORY_EDGE_START = 10000;
 const HISTORY_EDGE_TRIGGER = 14;
 const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 12;
+const TODO_DRAG_LONG_PRESS_MS = 320;
+const TODO_DRAG_CANCEL_DISTANCE = 8;
+const TODO_DRAG_AUTOSCROLL_EDGE = 56;
+const TODO_DRAG_AUTOSCROLL_STEP = 10;
 const TodoCore = window.TodoCore;
 
 const state = {
@@ -46,6 +50,7 @@ const state = {
   editingIndex: -1,
 };
 let isTrackingViewport = false;
+let activeTodoDragPointerId = null;
 
 function syncViewportBottomGap() {
   const vv = window.visualViewport;
@@ -136,6 +141,7 @@ function wireSwipe(content, handlers) {
   }
 
   function onPointerMove(e) {
+    if (activeTodoDragPointerId === e.pointerId) return;
     if (!canSwipe || !content.hasPointerCapture(e.pointerId)) return;
     const delta = e.clientX - startX;
     const deltaY = e.clientY - startY;
@@ -150,6 +156,13 @@ function wireSwipe(content, handlers) {
   }
 
   function onPointerUp(e) {
+    if (activeTodoDragPointerId === e.pointerId) {
+      if (content.hasPointerCapture(e.pointerId)) {
+        content.releasePointerCapture(e.pointerId);
+      }
+      canSwipe = false;
+      return;
+    }
     if (!canSwipe || !content.hasPointerCapture(e.pointerId)) return;
     const delta = e.clientX - startX;
     content.releasePointerCapture(e.pointerId);
@@ -196,6 +209,199 @@ function wireSwipe(content, handlers) {
   };
 }
 
+function getStateIndexFromVisualIndex(visualIndex) {
+  return state.todos.length - 1 - visualIndex;
+}
+
+function installTodoReorder(li, content, stateIndex) {
+  let pointerId = null;
+  let pressTimerId = 0;
+  let dragActive = false;
+  let dragOffsetY = 0;
+  let placeholder = null;
+  let startX = 0;
+  let startY = 0;
+  const fromVisualIndex = state.todos.length - 1 - stateIndex;
+
+  function clearPressTimer() {
+    if (!pressTimerId) return;
+    window.clearTimeout(pressTimerId);
+    pressTimerId = 0;
+  }
+
+  function resetDragStyles() {
+    li.style.position = "";
+    li.style.top = "";
+    li.style.left = "";
+    li.style.width = "";
+    li.style.zIndex = "";
+    li.style.pointerEvents = "";
+    li.classList.remove("dragging");
+    document.body.classList.remove("todo-dragging");
+  }
+
+  function maybeAutoScroll(clientY) {
+    const rect = todoView.getBoundingClientRect();
+    if (clientY < rect.top + TODO_DRAG_AUTOSCROLL_EDGE) {
+      todoView.scrollTop -= TODO_DRAG_AUTOSCROLL_STEP;
+    } else if (clientY > rect.bottom - TODO_DRAG_AUTOSCROLL_EDGE) {
+      todoView.scrollTop += TODO_DRAG_AUTOSCROLL_STEP;
+    }
+  }
+
+  function updatePlaceholderPosition(clientY) {
+    const candidates = Array.from(todoList.querySelectorAll('[data-todo-item="1"]'));
+    let inserted = false;
+    for (const candidate of candidates) {
+      const rect = candidate.getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2) {
+        todoList.insertBefore(placeholder, candidate);
+        inserted = true;
+        break;
+      }
+    }
+    if (!inserted) {
+      todoList.append(placeholder);
+    }
+  }
+
+  function updateDraggedPosition(clientY) {
+    li.style.top = `${clientY - dragOffsetY}px`;
+    maybeAutoScroll(clientY);
+    updatePlaceholderPosition(clientY);
+  }
+
+  function startDrag(clientY) {
+    if (dragActive || pointerId === null || state.editingIndex !== -1) return;
+    dragActive = true;
+    activeTodoDragPointerId = pointerId;
+    document.body.classList.add("todo-dragging");
+    li.classList.add("dragging");
+
+    const rect = li.getBoundingClientRect();
+    dragOffsetY = clientY - rect.top;
+    placeholder = document.createElement("li");
+    placeholder.className = "drag-placeholder";
+    placeholder.dataset.placeholder = "1";
+    placeholder.style.height = `${rect.height}px`;
+    todoList.replaceChild(placeholder, li);
+    document.body.append(li);
+
+    li.style.position = "fixed";
+    li.style.top = `${rect.top}px`;
+    li.style.left = `${rect.left}px`;
+    li.style.width = `${rect.width}px`;
+    li.style.zIndex = "80";
+    li.style.pointerEvents = "none";
+    updateDraggedPosition(clientY);
+  }
+
+  function finishDrag() {
+    if (!dragActive) return;
+    dragActive = false;
+    activeTodoDragPointerId = null;
+    li.dataset.suppressClick = "1";
+    if (placeholder && placeholder.parentNode === todoList) {
+      const sortable = Array.from(todoList.children).filter(
+        (el) => el.dataset.todoItem === "1" || el.dataset.placeholder === "1",
+      );
+      const toVisualIndex = sortable.indexOf(placeholder);
+      todoList.replaceChild(li, placeholder);
+      placeholder = null;
+      resetDragStyles();
+      if (toVisualIndex >= 0 && toVisualIndex !== fromVisualIndex) {
+        try {
+          TodoCore.moveTodo(
+            state,
+            getStateIndexFromVisualIndex(fromVisualIndex),
+            getStateIndexFromVisualIndex(toVisualIndex),
+          );
+          render();
+          saveState();
+        } catch (error) {
+          alert(error instanceof Error ? error.message : "並び替えに失敗しました。");
+          render();
+        }
+      } else {
+        render();
+      }
+      return;
+    }
+    resetDragStyles();
+  }
+
+  function cancelTracking() {
+    clearPressTimer();
+    pointerId = null;
+  }
+
+  function onPointerDown(e) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (state.editingIndex !== -1) return;
+    if (e.target.closest("input, button, label, a")) return;
+    pointerId = e.pointerId;
+    startX = e.clientX;
+    startY = e.clientY;
+    pressTimerId = window.setTimeout(() => {
+      startDrag(e.clientY);
+    }, TODO_DRAG_LONG_PRESS_MS);
+  }
+
+  function onPointerMove(e) {
+    if (pointerId !== e.pointerId) return;
+    if (!dragActive) {
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (Math.hypot(dx, dy) > TODO_DRAG_CANCEL_DISTANCE) {
+        clearPressTimer();
+      }
+      return;
+    }
+    if (content.hasPointerCapture(e.pointerId)) {
+      e.preventDefault();
+    }
+    updateDraggedPosition(e.clientY);
+  }
+
+  function onPointerEnd(e) {
+    if (pointerId !== e.pointerId) return;
+    clearPressTimer();
+    if (dragActive) {
+      e.preventDefault();
+      finishDrag();
+    }
+    if (content.hasPointerCapture(e.pointerId)) {
+      content.releasePointerCapture(e.pointerId);
+    }
+    pointerId = null;
+  }
+
+  function onPointerCancel(e) {
+    if (pointerId !== e.pointerId) return;
+    clearPressTimer();
+    if (dragActive) {
+      finishDrag();
+    }
+    pointerId = null;
+  }
+
+  content.addEventListener("pointerdown", onPointerDown);
+  content.addEventListener("pointermove", onPointerMove);
+  content.addEventListener("pointerup", onPointerEnd);
+  content.addEventListener("pointercancel", onPointerCancel);
+
+  li.addEventListener(
+    "click",
+    (e) => {
+      if (!li.dataset.suppressClick) return;
+      delete li.dataset.suppressClick;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    true,
+  );
+}
+
 function installEdgeHistorySwipe() {
   let startX = 0;
   let startY = 0;
@@ -228,9 +434,10 @@ function installEdgeHistorySwipe() {
   });
 }
 
-function createTodoItem(todo, index) {
+function createTodoItem(todo, stateIndex) {
   const li = document.createElement("li");
   li.className = "swipe-item";
+  li.dataset.todoItem = "1";
 
   const actions = document.createElement("div");
   actions.className = "swipe-actions";
@@ -240,7 +447,7 @@ function createTodoItem(todo, index) {
   editBtn.className = "swipe-action edit";
   editBtn.textContent = "編集";
   editBtn.addEventListener("click", () => {
-    state.editingIndex = index;
+    state.editingIndex = stateIndex;
     render();
   });
 
@@ -264,12 +471,12 @@ function createTodoItem(todo, index) {
   checkbox.type = "checkbox";
   checkbox.checked = todo.done;
   checkbox.addEventListener("change", () => {
-    state.todos[index].done = checkbox.checked;
+    state.todos[stateIndex].done = checkbox.checked;
     render();
     saveState();
   });
 
-  if (state.editingIndex === index) {
+  if (state.editingIndex === stateIndex) {
     const editInput = document.createElement("input");
     editInput.type = "text";
     editInput.className = "todo-edit-input";
@@ -283,7 +490,7 @@ function createTodoItem(todo, index) {
     saveBtn.textContent = "保存";
     saveBtn.addEventListener("click", () => {
       try {
-        TodoCore.updateTodoText(state, index, editInput.value, { maxTodoText: MAX_TODO_TEXT });
+        TodoCore.updateTodoText(state, stateIndex, editInput.value, { maxTodoText: MAX_TODO_TEXT });
         render();
         saveState();
       } catch (error) {
@@ -326,7 +533,7 @@ function createTodoItem(todo, index) {
   const swipe = wireSwipe(content, {
     onDelete: () => {
       try {
-        TodoCore.deleteTodo(state, index);
+        TodoCore.deleteTodo(state, stateIndex);
         render();
         saveState();
       } catch (error) {
@@ -340,6 +547,7 @@ function createTodoItem(todo, index) {
     },
   });
 
+  installTodoReorder(li, content, stateIndex);
   deleteBtn.addEventListener("click", swipe.remove);
 
   return li;
@@ -397,10 +605,10 @@ function render() {
     renderEmpty(todoList, "Todoはありません");
   } else {
     const todosByNewest = state.todos
-      .map((todo, index) => ({ todo, index }))
+      .map((todo, stateIndex) => ({ todo, stateIndex }))
       .reverse();
-    todosByNewest.forEach(({ todo, index }) => {
-      todoList.append(createTodoItem(todo, index));
+    todosByNewest.forEach(({ todo, stateIndex }) => {
+      todoList.append(createTodoItem(todo, stateIndex));
     });
   }
 

@@ -73,6 +73,31 @@
     }
   }
 
+  function moveTodo(state, fromIndex, toIndex) {
+    if (fromIndex < 0 || fromIndex >= state.todos.length) {
+      throw new Error("移動元のTodoが見つかりません。");
+    }
+    if (toIndex < 0 || toIndex >= state.todos.length) {
+      throw new Error("移動先のTodoが見つかりません。");
+    }
+    if (fromIndex === toIndex) return;
+
+    const [moved] = state.todos.splice(fromIndex, 1);
+    state.todos.splice(toIndex, 0, moved);
+
+    if (state.editingIndex === fromIndex) {
+      state.editingIndex = toIndex;
+      return;
+    }
+    if (fromIndex < toIndex && state.editingIndex > fromIndex && state.editingIndex <= toIndex) {
+      state.editingIndex -= 1;
+      return;
+    }
+    if (toIndex < fromIndex && state.editingIndex >= toIndex && state.editingIndex < fromIndex) {
+      state.editingIndex += 1;
+    }
+  }
+
   function getStatePayload(state) {
     return {
       version: DEFAULT_VERSION,
@@ -114,6 +139,7 @@
     applyImportPayload,
     deleteTodo,
     getStatePayload,
+    moveTodo,
     updateTodoText,
     validateImportPayload,
   };
