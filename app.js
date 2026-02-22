@@ -116,6 +116,7 @@ function updateMoveHistoryButton() {
 
 function wireSwipe(content, handlers) {
   const { onDelete, onSwipeRight, actionWidth = SWIPE_ACTIONS_WIDTH } = handlers;
+  const row = content.closest(".swipe-item");
   let startX = 0;
   let startY = 0;
   let canSwipe = false;
@@ -123,6 +124,9 @@ function wireSwipe(content, handlers) {
 
   function setShift(shift) {
     content.style.transform = `translateX(${shift}px)`;
+    if (row) {
+      row.classList.toggle("actions-visible", shift < -1);
+    }
   }
 
   function close() {
