@@ -34,10 +34,10 @@ const MAX_HISTORY = 3000;
 const MAX_IMPORT_SIZE = 1024 * 1024;
 const MAX_WALLPAPER_SIZE = 15 * 1024 * 1024;
 const SWIPE_ACTIONS_WIDTH = 172;
-const TASK_ACTION_TRIGGER = 18;
-const HISTORY_EDGE_START = 72;
-const HISTORY_EDGE_TRIGGER = 40;
-const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 64;
+const TASK_ACTION_TRIGGER = 14;
+const HISTORY_EDGE_START = 120;
+const HISTORY_EDGE_TRIGGER = 30;
+const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 40;
 
 const state = {
   todos: [],
@@ -139,7 +139,7 @@ function wireSwipe(content, handlers) {
     if (!canSwipe || !content.hasPointerCapture(e.pointerId)) return;
     const delta = e.clientX - startX;
     const deltaY = e.clientY - startY;
-    if (Math.abs(deltaY) > Math.abs(delta) * 1.35) return;
+    if (Math.abs(deltaY) > Math.abs(delta) * 1.8) return;
 
     if (delta < 0) {
       setShift(Math.max(-SWIPE_ACTIONS_WIDTH, delta));
@@ -309,6 +309,16 @@ function createTodoItem(todo, index) {
     text.textContent = todo.text;
 
     left.append(checkbox, text);
+
+    // Tap on the front half of a row to toggle completion quickly on mobile.
+    left.addEventListener("click", (e) => {
+      if (e.target.closest("input, button")) return;
+      const rect = inner.getBoundingClientRect();
+      if (e.clientX <= rect.left + rect.width * 0.55) {
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
   }
 
   inner.append(left, right);
