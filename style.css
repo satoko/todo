@@ -121,17 +121,29 @@ body.history-mode {
   border: 1px solid #e4e7ec;
 }
 
-.swipe-action {
+.swipe-actions {
   position: absolute;
   right: 0;
   top: 0;
   bottom: 0;
+  width: 172px;
+  display: flex;
+}
+
+.swipe-action {
   width: 86px;
   border: none;
-  background: var(--danger);
   color: #fff;
   font-size: 0.95rem;
   cursor: pointer;
+}
+
+.swipe-action.edit {
+  background: #0f766e;
+}
+
+.swipe-action.delete {
+  background: var(--danger);
 }
 
 .swipe-content {
@@ -167,14 +179,6 @@ body.history-mode {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.edit-btn {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  padding: 6px 10px;
-  cursor: pointer;
 }
 
 .todo-edit-input {

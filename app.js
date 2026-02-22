@@ -33,10 +33,11 @@ const MAX_TODOS = 1000;
 const MAX_HISTORY = 3000;
 const MAX_IMPORT_SIZE = 1024 * 1024;
 const MAX_WALLPAPER_SIZE = 15 * 1024 * 1024;
-const DELETE_SWIPE_WIDTH = 86;
-const RIGHT_EDGE_SWIPE_START = 56;
-const HISTORY_EDGE_START = 24;
-const HISTORY_EDGE_TRIGGER = 72;
+const SWIPE_ACTIONS_WIDTH = 172;
+const TASK_ACTION_TRIGGER = 28;
+const HISTORY_EDGE_START = 40;
+const HISTORY_EDGE_TRIGGER = 56;
+const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 96;
 
 const state = {
   todos: [],
@@ -107,7 +108,8 @@ function updateMoveHistoryButton() {
   moveHistoryBtn.disabled = checkedCount === 0;
 }
 
-function wireSwipe(content, onDelete) {
+function wireSwipe(content, handlers) {
+  const { onDelete, onSwipeRight } = handlers;
   let startX = 0;
   let startY = 0;
   let canSwipe = false;
@@ -126,8 +128,7 @@ function wireSwipe(content, onDelete) {
   function onPointerDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (e.target.closest("input, button, label, a")) return;
-    const rect = content.getBoundingClientRect();
-    canSwipe = e.clientX >= rect.right - RIGHT_EDGE_SWIPE_START || open;
+    canSwipe = true;
     if (!canSwipe) return;
     startX = e.clientX;
     startY = e.clientY;
@@ -141,10 +142,10 @@ function wireSwipe(content, onDelete) {
     if (Math.abs(deltaY) > Math.abs(delta)) return;
 
     if (delta < 0) {
-      setShift(Math.max(-DELETE_SWIPE_WIDTH, delta));
+      setShift(Math.max(-SWIPE_ACTIONS_WIDTH, delta));
     }
     if (delta > 0 && open) {
-      setShift(Math.min(0, -DELETE_SWIPE_WIDTH + delta));
+      setShift(Math.min(0, -SWIPE_ACTIONS_WIDTH + delta));
     }
   }
 
@@ -153,20 +154,28 @@ function wireSwipe(content, onDelete) {
     const delta = e.clientX - startX;
     content.releasePointerCapture(e.pointerId);
 
-    if (delta < -42) {
-      setShift(-DELETE_SWIPE_WIDTH);
+    if (delta < -TASK_ACTION_TRIGGER) {
+      setShift(-SWIPE_ACTIONS_WIDTH);
       open = true;
+      canSwipe = false;
       return;
     }
 
     if (delta > 20 && open) {
       close();
+      canSwipe = false;
       return;
     }
 
-    if (!open) {
-      close();
+    if (delta > HISTORY_SWIPE_FROM_ITEM_TRIGGER && !open) {
+      if (typeof onSwipeRight === "function") {
+        onSwipeRight();
+      }
+      canSwipe = false;
+      return;
     }
+
+    close();
     canSwipe = false;
   }
 
@@ -178,7 +187,7 @@ function wireSwipe(content, onDelete) {
   return {
     close,
     open: () => {
-      setShift(-DELETE_SWIPE_WIDTH);
+      setShift(-SWIPE_ACTIONS_WIDTH);
       open = true;
     },
     remove: () => {
@@ -194,7 +203,7 @@ function installEdgeHistorySwipe() {
 
   function onPointerDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (e.target.closest("input, button, dialog, .swipe-item")) return;
+    if (e.target.closest("input, button, dialog")) return;
     if (e.clientX > HISTORY_EDGE_START) return;
     tracking = true;
     startX = e.clientX;
@@ -223,10 +232,23 @@ function createTodoItem(todo, index) {
   const li = document.createElement("li");
   li.className = "swipe-item";
 
+  const actions = document.createElement("div");
+  actions.className = "swipe-actions";
+
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "swipe-action edit";
+  editBtn.textContent = "編集";
+  editBtn.addEventListener("click", () => {
+    state.editingIndex = index;
+    render();
+  });
+
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
-  deleteBtn.className = "swipe-action";
+  deleteBtn.className = "swipe-action delete";
   deleteBtn.textContent = "削除";
+  actions.append(editBtn, deleteBtn);
 
   const content = document.createElement("div");
   content.className = "swipe-content";
@@ -286,32 +308,29 @@ function createTodoItem(todo, index) {
     text.className = `todo-text ${todo.done ? "done" : ""}`;
     text.textContent = todo.text;
 
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "edit-btn";
-    editBtn.textContent = "編集";
-    editBtn.addEventListener("click", () => {
-      state.editingIndex = index;
-      render();
-    });
-
     left.append(checkbox, text);
-    right.append(editBtn);
   }
 
   inner.append(left, right);
   content.append(inner);
-  li.append(deleteBtn, content);
+  li.append(actions, content);
 
-  const swipe = wireSwipe(content, () => {
-    state.todos.splice(index, 1);
-    if (state.editingIndex === index) {
-      state.editingIndex = -1;
-    } else if (state.editingIndex > index) {
-      state.editingIndex -= 1;
-    }
-    render();
-    saveState();
+  const swipe = wireSwipe(content, {
+    onDelete: () => {
+      state.todos.splice(index, 1);
+      if (state.editingIndex === index) {
+        state.editingIndex = -1;
+      } else if (state.editingIndex > index) {
+        state.editingIndex -= 1;
+      }
+      render();
+      saveState();
+    },
+    onSwipeRight: () => {
+      if (historyView.classList.contains("hidden")) {
+        setView("history");
+      }
+    },
   });
 
   deleteBtn.addEventListener("click", swipe.remove);
