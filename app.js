@@ -34,10 +34,10 @@ const MAX_HISTORY = 3000;
 const MAX_IMPORT_SIZE = 1024 * 1024;
 const MAX_WALLPAPER_SIZE = 15 * 1024 * 1024;
 const SWIPE_ACTIONS_WIDTH = 172;
-const TASK_ACTION_TRIGGER = 14;
-const HISTORY_EDGE_START = 120;
-const HISTORY_EDGE_TRIGGER = 30;
-const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 40;
+const TASK_ACTION_TRIGGER = 8;
+const HISTORY_EDGE_START = 220;
+const HISTORY_EDGE_TRIGGER = 18;
+const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 20;
 
 const state = {
   todos: [],
@@ -139,7 +139,7 @@ function wireSwipe(content, handlers) {
     if (!canSwipe || !content.hasPointerCapture(e.pointerId)) return;
     const delta = e.clientX - startX;
     const deltaY = e.clientY - startY;
-    if (Math.abs(deltaY) > Math.abs(delta) * 1.8) return;
+    if (Math.abs(deltaY) > Math.abs(delta) * 2.6) return;
 
     if (delta < 0) {
       setShift(Math.max(-SWIPE_ACTIONS_WIDTH, delta));
@@ -215,7 +215,7 @@ function installEdgeHistorySwipe() {
     tracking = false;
     const deltaX = e.clientX - startX;
     const deltaY = e.clientY - startY;
-    if (deltaX > HISTORY_EDGE_TRIGGER && Math.abs(deltaX) > Math.abs(deltaY) * 0.85) {
+    if (deltaX > HISTORY_EDGE_TRIGGER && Math.abs(deltaX) > Math.abs(deltaY) * 0.55) {
       const isTodo = historyView.classList.contains("hidden");
       setView(isTodo ? "history" : "todo");
     }
