@@ -151,6 +151,11 @@ body.history-mode .bg-layer {
   display: flex;
 }
 
+.swipe-actions.single {
+  width: 86px;
+  justify-content: flex-end;
+}
+
 .swipe-action {
   width: 86px;
   border: none;

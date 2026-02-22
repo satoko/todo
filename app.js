@@ -108,7 +108,7 @@ function updateMoveHistoryButton() {
 }
 
 function wireSwipe(content, handlers) {
-  const { onDelete, onSwipeRight } = handlers;
+  const { onDelete, onSwipeRight, actionWidth = SWIPE_ACTIONS_WIDTH } = handlers;
   let startX = 0;
   let startY = 0;
   let canSwipe = false;
@@ -141,10 +141,10 @@ function wireSwipe(content, handlers) {
     if (Math.abs(deltaY) > Math.abs(delta) * 3.5) return;
 
     if (delta < 0) {
-      setShift(Math.max(-SWIPE_ACTIONS_WIDTH, delta));
+      setShift(Math.max(-actionWidth, delta));
     }
     if (delta > 0 && open) {
-      setShift(Math.min(0, -SWIPE_ACTIONS_WIDTH + delta));
+      setShift(Math.min(0, -actionWidth + delta));
     }
   }
 
@@ -154,7 +154,7 @@ function wireSwipe(content, handlers) {
     content.releasePointerCapture(e.pointerId);
 
     if (delta < -TASK_ACTION_TRIGGER) {
-      setShift(-SWIPE_ACTIONS_WIDTH);
+      setShift(-actionWidth);
       open = true;
       canSwipe = false;
       return;
@@ -186,7 +186,7 @@ function wireSwipe(content, handlers) {
   return {
     close,
     open: () => {
-      setShift(-SWIPE_ACTIONS_WIDTH);
+      setShift(-actionWidth);
       open = true;
     },
     remove: () => {
@@ -347,9 +347,18 @@ function createTodoItem(todo, index) {
   return li;
 }
 
-function createHistoryItem(item) {
+function createHistoryItem(item, index) {
   const li = document.createElement("li");
   li.className = "swipe-item";
+
+  const actions = document.createElement("div");
+  actions.className = "swipe-actions single";
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "swipe-action delete";
+  deleteBtn.textContent = "削除";
+  actions.append(deleteBtn);
 
   const content = document.createElement("div");
   content.className = "swipe-content";
@@ -366,7 +375,18 @@ function createHistoryItem(item) {
 
   inner.append(text, movedAt);
   content.append(inner);
-  li.append(content);
+  li.append(actions, content);
+
+  const swipe = wireSwipe(content, {
+    actionWidth: 86,
+    onDelete: () => {
+      state.history.splice(index, 1);
+      render();
+      saveState();
+    },
+  });
+
+  deleteBtn.addEventListener("click", swipe.remove);
 
   return li;
 }
@@ -386,8 +406,8 @@ function render() {
   if (state.history.length === 0) {
     renderEmpty(historyList, "履歴はありません");
   } else {
-    state.history.forEach((item) => {
-      historyList.append(createHistoryItem(item));
+    state.history.forEach((item, index) => {
+      historyList.append(createHistoryItem(item, index));
     });
   }
 
