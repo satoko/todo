@@ -39,7 +39,7 @@ const HISTORY_EDGE_START = 10000;
 const HISTORY_EDGE_TRIGGER = 14;
 const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 12;
 const TODO_DRAG_LONG_PRESS_MS = 320;
-const TODO_DRAG_CANCEL_DISTANCE = 8;
+const TODO_DRAG_CANCEL_DISTANCE = 18;
 const TODO_DRAG_AUTOSCROLL_EDGE = 56;
 const TODO_DRAG_AUTOSCROLL_STEP = 10;
 const TodoCore = window.TodoCore;
@@ -51,6 +51,7 @@ const state = {
 };
 let isTrackingViewport = false;
 let activeTodoDragPointerId = null;
+let pendingTodoDragPointerId = null;
 
 function syncViewportBottomGap() {
   const vv = window.visualViewport;
@@ -142,6 +143,7 @@ function wireSwipe(content, handlers) {
 
   function onPointerMove(e) {
     if (activeTodoDragPointerId === e.pointerId) return;
+    if (pendingTodoDragPointerId === e.pointerId) return;
     if (!canSwipe || !content.hasPointerCapture(e.pointerId)) return;
     const delta = e.clientX - startX;
     const deltaY = e.clientY - startY;
@@ -161,6 +163,13 @@ function wireSwipe(content, handlers) {
         content.releasePointerCapture(e.pointerId);
       }
       canSwipe = false;
+      return;
+    }
+    if (pendingTodoDragPointerId === e.pointerId) {
+      if (content.hasPointerCapture(e.pointerId)) {
+        content.releasePointerCapture(e.pointerId);
+      }
+      close();
       return;
     }
     if (!canSwipe || !content.hasPointerCapture(e.pointerId)) return;
@@ -221,6 +230,7 @@ function installTodoReorder(li, content, stateIndex) {
   let placeholder = null;
   let startX = 0;
   let startY = 0;
+  let lastClientY = 0;
   const fromVisualIndex = state.todos.length - 1 - stateIndex;
 
   function clearPressTimer() {
@@ -274,6 +284,7 @@ function installTodoReorder(li, content, stateIndex) {
   function startDrag(clientY) {
     if (dragActive || pointerId === null || state.editingIndex !== -1) return;
     dragActive = true;
+    pendingTodoDragPointerId = null;
     activeTodoDragPointerId = pointerId;
     document.body.classList.add("todo-dragging");
     li.classList.add("dragging");
@@ -300,6 +311,7 @@ function installTodoReorder(li, content, stateIndex) {
     if (!dragActive) return;
     dragActive = false;
     activeTodoDragPointerId = null;
+    pendingTodoDragPointerId = null;
     li.dataset.suppressClick = "1";
     if (placeholder && placeholder.parentNode === todoList) {
       const sortable = Array.from(todoList.children).filter(
@@ -332,6 +344,7 @@ function installTodoReorder(li, content, stateIndex) {
 
   function cancelTracking() {
     clearPressTimer();
+    pendingTodoDragPointerId = null;
     pointerId = null;
   }
 
@@ -340,20 +353,24 @@ function installTodoReorder(li, content, stateIndex) {
     if (state.editingIndex !== -1) return;
     if (e.target.closest("input, button, label, a")) return;
     pointerId = e.pointerId;
+    pendingTodoDragPointerId = pointerId;
     startX = e.clientX;
     startY = e.clientY;
+    lastClientY = e.clientY;
     pressTimerId = window.setTimeout(() => {
-      startDrag(e.clientY);
+      startDrag(lastClientY);
     }, TODO_DRAG_LONG_PRESS_MS);
   }
 
   function onPointerMove(e) {
     if (pointerId !== e.pointerId) return;
+    lastClientY = e.clientY;
     if (!dragActive) {
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
       if (Math.hypot(dx, dy) > TODO_DRAG_CANCEL_DISTANCE) {
         clearPressTimer();
+        pendingTodoDragPointerId = null;
       }
       return;
     }
@@ -374,6 +391,7 @@ function installTodoReorder(li, content, stateIndex) {
       content.releasePointerCapture(e.pointerId);
     }
     pointerId = null;
+    pendingTodoDragPointerId = null;
   }
 
   function onPointerCancel(e) {
@@ -383,6 +401,7 @@ function installTodoReorder(li, content, stateIndex) {
       finishDrag();
     }
     pointerId = null;
+    pendingTodoDragPointerId = null;
   }
 
   content.addEventListener("pointerdown", onPointerDown);
