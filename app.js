@@ -9,8 +9,7 @@ const closeAddTodoBtn = document.querySelector("#close-add-todo-btn");
 
 const todoView = document.querySelector("#todo-view");
 const historyView = document.querySelector("#history-view");
-const showTodoBtn = document.querySelector("#show-todo-btn");
-const showHistoryBtn = document.querySelector("#show-history-btn");
+const toggleViewBtn = document.querySelector("#toggle-view-btn");
 const moveHistoryBtn = document.querySelector("#move-history-btn");
 const reloadBtn = document.querySelector("#reload-btn");
 const historyPruneBtn = document.querySelector("#history-prune-btn");
@@ -85,8 +84,7 @@ function setView(mode) {
   const isTodo = mode === "todo";
   todoView.classList.toggle("hidden", !isTodo);
   historyView.classList.toggle("hidden", isTodo);
-  showTodoBtn.classList.toggle("active", isTodo);
-  showHistoryBtn.classList.toggle("active", !isTodo);
+  toggleViewBtn.textContent = isTodo ? "Todo" : "履歴";
   moveHistoryBtn.classList.toggle("hidden", !isTodo);
   historyPruneBtn.classList.toggle("hidden", isTodo);
   addTodoFab.classList.toggle("hidden", !isTodo);
@@ -587,8 +585,10 @@ addTodoDialog.addEventListener("close", () => {
   stopViewportTracking();
 });
 
-showTodoBtn.addEventListener("click", () => setView("todo"));
-showHistoryBtn.addEventListener("click", () => setView("history"));
+toggleViewBtn.addEventListener("click", () => {
+  const isTodo = historyView.classList.contains("hidden");
+  setView(isTodo ? "history" : "todo");
+});
 moveHistoryBtn.addEventListener("click", moveCheckedToHistory);
 reloadBtn.addEventListener("click", () => {
   window.location.reload();
