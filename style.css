@@ -5,6 +5,7 @@
   --line: #d0d5dd;
   --primary: #4682b4;
   --danger: #b42318;
+  --vv-bottom-gap: 0px;
 }
 
 * {
@@ -58,6 +59,11 @@ body {
   background: var(--primary);
   border-color: var(--primary);
   color: #fff;
+}
+
+.primary-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .small-btn.active {
@@ -139,9 +145,44 @@ body.history-mode {
 .swipe-content-inner {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
   min-height: 50px;
   padding: 10px 12px;
+}
+
+.todo-item-left,
+.todo-item-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.todo-item-left {
+  min-width: 0;
+  flex: 1;
+}
+
+.todo-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-btn {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.todo-edit-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 1rem;
 }
 
 .todo-text.done {
@@ -167,7 +208,7 @@ body.history-mode {
 .add-todo-fab {
   position: fixed;
   right: 18px;
-  bottom: calc(92px + env(safe-area-inset-bottom));
+  bottom: calc(92px + env(safe-area-inset-bottom) + var(--vv-bottom-gap));
   width: 58px;
   height: 58px;
   border-radius: 999px;
@@ -178,6 +219,7 @@ body.history-mode {
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 10px 26px rgba(70, 130, 180, 0.35);
+  z-index: 2200;
 }
 
 .add-todo-dialog {
@@ -194,7 +236,7 @@ body.history-mode {
   position: fixed;
   left: 12px;
   right: 12px;
-  bottom: calc(86px + env(safe-area-inset-bottom));
+  bottom: calc(86px + env(safe-area-inset-bottom) + var(--vv-bottom-gap));
   display: grid;
   gap: 10px;
   background: rgba(255, 255, 255, 0.97);

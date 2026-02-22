@@ -41,7 +41,43 @@ const HISTORY_EDGE_TRIGGER = 72;
 const state = {
   todos: [],
   history: [],
+  editingIndex: -1,
 };
+let isTrackingViewport = false;
+
+function syncViewportBottomGap() {
+  const vv = window.visualViewport;
+  if (!vv) {
+    document.documentElement.style.setProperty("--vv-bottom-gap", "0px");
+    return;
+  }
+  const inset = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+  document.documentElement.style.setProperty("--vv-bottom-gap", `${inset}px`);
+}
+
+function startViewportTracking() {
+  if (isTrackingViewport) return;
+  isTrackingViewport = true;
+  const vv = window.visualViewport;
+  if (vv) {
+    vv.addEventListener("resize", syncViewportBottomGap);
+    vv.addEventListener("scroll", syncViewportBottomGap);
+  }
+  window.addEventListener("orientationchange", syncViewportBottomGap);
+  syncViewportBottomGap();
+}
+
+function stopViewportTracking() {
+  if (!isTrackingViewport) return;
+  isTrackingViewport = false;
+  const vv = window.visualViewport;
+  if (vv) {
+    vv.removeEventListener("resize", syncViewportBottomGap);
+    vv.removeEventListener("scroll", syncViewportBottomGap);
+  }
+  window.removeEventListener("orientationchange", syncViewportBottomGap);
+  document.documentElement.style.setProperty("--vv-bottom-gap", "0px");
+}
 
 function setView(mode) {
   const isTodo = mode === "todo";
@@ -63,6 +99,12 @@ function renderEmpty(listEl, message) {
   li.className = "empty";
   li.textContent = message;
   listEl.append(li);
+}
+
+function updateMoveHistoryButton() {
+  const checkedCount = state.todos.filter((todo) => todo.done).length;
+  moveHistoryBtn.textContent = checkedCount > 0 ? `${checkedCount}件を履歴へ移動` : "履歴へ移動";
+  moveHistoryBtn.disabled = checkedCount === 0;
 }
 
 function wireSwipe(content, onDelete) {
@@ -191,6 +233,10 @@ function createTodoItem(todo, index) {
 
   const inner = document.createElement("div");
   inner.className = "swipe-content-inner";
+  const left = document.createElement("div");
+  left.className = "todo-item-left";
+  const right = document.createElement("div");
+  right.className = "todo-item-right";
 
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
@@ -201,16 +247,69 @@ function createTodoItem(todo, index) {
     saveState();
   });
 
-  const text = document.createElement("span");
-  text.className = `todo-text ${todo.done ? "done" : ""}`;
-  text.textContent = todo.text;
+  if (state.editingIndex === index) {
+    const editInput = document.createElement("input");
+    editInput.type = "text";
+    editInput.className = "todo-edit-input";
+    editInput.value = todo.text;
+    editInput.maxLength = MAX_TODO_TEXT;
+    left.append(checkbox, editInput);
 
-  inner.append(checkbox, text);
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "primary-btn";
+    saveBtn.textContent = "保存";
+    saveBtn.addEventListener("click", () => {
+      const nextText = editInput.value.trim();
+      if (!nextText) {
+        alert("空のタスクにはできません。");
+        return;
+      }
+      state.todos[index].text = nextText;
+      state.editingIndex = -1;
+      render();
+      saveState();
+    });
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "small-btn";
+    cancelBtn.textContent = "キャンセル";
+    cancelBtn.addEventListener("click", () => {
+      state.editingIndex = -1;
+      render();
+    });
+
+    right.append(saveBtn, cancelBtn);
+  } else {
+    const text = document.createElement("span");
+    text.className = `todo-text ${todo.done ? "done" : ""}`;
+    text.textContent = todo.text;
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "edit-btn";
+    editBtn.textContent = "編集";
+    editBtn.addEventListener("click", () => {
+      state.editingIndex = index;
+      render();
+    });
+
+    left.append(checkbox, text);
+    right.append(editBtn);
+  }
+
+  inner.append(left, right);
   content.append(inner);
   li.append(deleteBtn, content);
 
   const swipe = wireSwipe(content, () => {
     state.todos.splice(index, 1);
+    if (state.editingIndex === index) {
+      state.editingIndex = -1;
+    } else if (state.editingIndex > index) {
+      state.editingIndex -= 1;
+    }
     render();
     saveState();
   });
@@ -263,6 +362,8 @@ function render() {
       historyList.append(createHistoryItem(item));
     });
   }
+
+  updateMoveHistoryButton();
 }
 
 function moveCheckedToHistory() {
@@ -283,6 +384,7 @@ function moveCheckedToHistory() {
   });
 
   state.todos = state.todos.filter((todo) => !todo.done);
+  state.editingIndex = -1;
   render();
   saveState();
 }
@@ -425,6 +527,7 @@ form.addEventListener("submit", (e) => {
   }
 
   state.todos.push({ text, done: false });
+  state.editingIndex = -1;
   input.value = "";
   render();
   saveState();
@@ -434,12 +537,20 @@ form.addEventListener("submit", (e) => {
 addTodoFab.addEventListener("click", () => {
   if (typeof addTodoDialog.showModal === "function") {
     addTodoDialog.showModal();
-    input.focus();
+    startViewportTracking();
+    requestAnimationFrame(() => {
+      input.focus();
+      syncViewportBottomGap();
+    });
   }
 });
 
 closeAddTodoBtn.addEventListener("click", () => {
   addTodoDialog.close();
+});
+
+addTodoDialog.addEventListener("close", () => {
+  stopViewportTracking();
 });
 
 showTodoBtn.addEventListener("click", () => setView("todo"));
@@ -519,6 +630,7 @@ importJsonInput.addEventListener("change", () => {
 
       state.todos = parsed.todos.map((todo) => ({ text: todo.text, done: todo.done }));
       state.history = parsed.history.map((item) => ({ text: item.text, movedAt: item.movedAt }));
+      state.editingIndex = -1;
       setView("todo");
       render();
       saveState();

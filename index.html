@@ -21,7 +21,6 @@
         <div class="top-actions">
           <button id="move-history-btn" class="primary-btn" type="button">履歴へ移動</button>
           <button id="history-prune-btn" class="small-btn" type="button">指定日付以前を削除</button>
-          <button id="reload-btn" class="small-btn" type="button">Reload</button>
           <button id="settings-btn" class="small-btn" type="button">設定</button>
         </div>
       </header>
@@ -68,6 +67,13 @@
           </div>
           <input id="import-json-input" type="file" accept="application/json,.json" class="hidden" />
           <small class="format-note">形式: { "version": 1, "todos": [...], "history": [...] }</small>
+        </section>
+
+        <section class="settings-section">
+          <p>アプリ</p>
+          <div class="settings-actions settings-inline">
+            <button id="reload-btn" type="button" class="small-btn">Reload</button>
+          </div>
         </section>
 
         <div class="settings-actions">
