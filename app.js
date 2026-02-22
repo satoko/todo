@@ -38,6 +38,7 @@ const TASK_ACTION_TRIGGER = 5;
 const HISTORY_EDGE_START = 10000;
 const HISTORY_EDGE_TRIGGER = 14;
 const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 12;
+const TodoCore = window.TodoCore;
 
 const state = {
   todos: [],
@@ -281,15 +282,13 @@ function createTodoItem(todo, index) {
     saveBtn.className = "primary-btn";
     saveBtn.textContent = "保存";
     saveBtn.addEventListener("click", () => {
-      const nextText = editInput.value.trim();
-      if (!nextText) {
-        alert("空のタスクにはできません。");
-        return;
+      try {
+        TodoCore.updateTodoText(state, index, editInput.value, { maxTodoText: MAX_TODO_TEXT });
+        render();
+        saveState();
+      } catch (error) {
+        alert(error instanceof Error ? error.message : "更新に失敗しました。");
       }
-      state.todos[index].text = nextText;
-      state.editingIndex = -1;
-      render();
-      saveState();
     });
 
     const cancelBtn = document.createElement("button");
@@ -326,14 +325,13 @@ function createTodoItem(todo, index) {
 
   const swipe = wireSwipe(content, {
     onDelete: () => {
-      state.todos.splice(index, 1);
-      if (state.editingIndex === index) {
-        state.editingIndex = -1;
-      } else if (state.editingIndex > index) {
-        state.editingIndex -= 1;
+      try {
+        TodoCore.deleteTodo(state, index);
+        render();
+        saveState();
+      } catch (error) {
+        alert(error instanceof Error ? error.message : "削除に失敗しました。");
       }
-      render();
-      saveState();
     },
     onSwipeRight: () => {
       if (historyView.classList.contains("hidden")) {
@@ -452,46 +450,6 @@ function applyWallpaper(dataUrl) {
   localStorage.setItem(STORAGE_KEY, dataUrl);
 }
 
-function isExactObjectKeys(value, keys) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const valueKeys = Object.keys(value);
-  if (valueKeys.length !== keys.length) return false;
-  return keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
-}
-
-function isValidTodoEntry(item) {
-  if (!isExactObjectKeys(item, ["text", "done"])) return false;
-  if (typeof item.text !== "string" || typeof item.done !== "boolean") return false;
-  if (item.text.length === 0 || item.text.length > MAX_TODO_TEXT) return false;
-  return true;
-}
-
-function isValidHistoryEntry(item) {
-  if (!isExactObjectKeys(item, ["text", "movedAt"])) return false;
-  if (typeof item.text !== "string" || typeof item.movedAt !== "string") return false;
-  if (item.text.length === 0 || item.text.length > MAX_TODO_TEXT) return false;
-  if (item.movedAt.length === 0 || item.movedAt.length > 40) return false;
-  return true;
-}
-
-function validateImportPayload(payload) {
-  if (!isExactObjectKeys(payload, ["version", "todos", "history"])) {
-    throw new Error("JSONフォーマットが不正です。");
-  }
-  if (payload.version !== 1) {
-    throw new Error("未対応のversionです。");
-  }
-  if (!Array.isArray(payload.todos) || !Array.isArray(payload.history)) {
-    throw new Error("todos/historyは配列である必要があります。");
-  }
-  if (payload.todos.length > MAX_TODOS || payload.history.length > MAX_HISTORY) {
-    throw new Error("件数が上限を超えています。");
-  }
-  if (!payload.todos.every(isValidTodoEntry) || !payload.history.every(isValidHistoryEntry)) {
-    throw new Error("todos/historyの要素形式が不正です。");
-  }
-}
-
 function downloadJsonFile(data, filename) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -512,16 +470,8 @@ function formatDateForFilename(date) {
   return `${y}-${m}-${d}_${hh}-${mm}-${ss}`;
 }
 
-function getStatePayload() {
-  return {
-    version: 1,
-    todos: state.todos.map((todo) => ({ text: todo.text, done: todo.done })),
-    history: state.history.map((item) => ({ text: item.text, movedAt: item.movedAt })),
-  };
-}
-
 function saveState() {
-  localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(getStatePayload()));
+  localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(TodoCore.getStatePayload(state)));
 }
 
 function loadState() {
@@ -530,9 +480,12 @@ function loadState() {
 
   try {
     const parsed = JSON.parse(raw);
-    validateImportPayload(parsed);
-    state.todos = parsed.todos.map((todo) => ({ text: todo.text, done: todo.done }));
-    state.history = parsed.history.map((item) => ({ text: item.text, movedAt: item.movedAt }));
+    TodoCore.validateImportPayload(parsed, {
+      maxTodoText: MAX_TODO_TEXT,
+      maxTodos: MAX_TODOS,
+      maxHistory: MAX_HISTORY,
+    });
+    TodoCore.applyImportPayload(state, parsed);
   } catch {
     localStorage.removeItem(STATE_STORAGE_KEY);
   }
@@ -571,19 +524,16 @@ function extractDateKeyFromMovedAt(movedAt) {
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
-  const text = input.value.trim();
-  if (!text) return;
-  if (text.length > MAX_TODO_TEXT) {
-    alert(`Todoは${MAX_TODO_TEXT}文字以内で入力してください。`);
-    return;
+  try {
+    TodoCore.addTodo(state, input.value, { maxTodoText: MAX_TODO_TEXT, maxTodos: MAX_TODOS });
+    input.value = "";
+    render();
+    saveState();
+    addTodoDialog.close();
+  } catch (error) {
+    if (error instanceof Error && error.message === "空のタスクにはできません。") return;
+    alert(error instanceof Error ? error.message : "Todoの追加に失敗しました。");
   }
-
-  state.todos.push({ text, done: false });
-  state.editingIndex = -1;
-  input.value = "";
-  render();
-  saveState();
-  addTodoDialog.close();
 });
 
 addTodoFab.addEventListener("click", () => {
@@ -658,7 +608,7 @@ clearWallpaperBtn.addEventListener("click", () => {
 });
 
 exportJsonBtn.addEventListener("click", () => {
-  const payload = getStatePayload();
+  const payload = TodoCore.getStatePayload(state);
   downloadJsonFile(payload, `todo-export-${formatDateForFilename(new Date())}.json`);
 });
 
@@ -680,11 +630,12 @@ importJsonInput.addEventListener("change", () => {
     try {
       const text = String(reader.result);
       const parsed = JSON.parse(text);
-      validateImportPayload(parsed);
-
-      state.todos = parsed.todos.map((todo) => ({ text: todo.text, done: todo.done }));
-      state.history = parsed.history.map((item) => ({ text: item.text, movedAt: item.movedAt }));
-      state.editingIndex = -1;
+      TodoCore.validateImportPayload(parsed, {
+        maxTodoText: MAX_TODO_TEXT,
+        maxTodos: MAX_TODOS,
+        maxHistory: MAX_HISTORY,
+      });
+      TodoCore.applyImportPayload(state, parsed);
       setView("todo");
       render();
       saveState();
