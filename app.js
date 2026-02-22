@@ -34,9 +34,10 @@ const MAX_HISTORY = 3000;
 const MAX_IMPORT_SIZE = 1024 * 1024;
 const MAX_WALLPAPER_SIZE = 15 * 1024 * 1024;
 const SWIPE_ACTIONS_WIDTH = 172;
-const RIGHT_EDGE_SWIPE_START = 56;
-const HISTORY_EDGE_START = 24;
-const HISTORY_EDGE_TRIGGER = 72;
+const TASK_ACTION_TRIGGER = 28;
+const HISTORY_EDGE_START = 40;
+const HISTORY_EDGE_TRIGGER = 56;
+const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 96;
 
 const state = {
   todos: [],
@@ -107,7 +108,8 @@ function updateMoveHistoryButton() {
   moveHistoryBtn.disabled = checkedCount === 0;
 }
 
-function wireSwipe(content, onDelete) {
+function wireSwipe(content, handlers) {
+  const { onDelete, onSwipeRight } = handlers;
   let startX = 0;
   let startY = 0;
   let canSwipe = false;
@@ -126,8 +128,7 @@ function wireSwipe(content, onDelete) {
   function onPointerDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (e.target.closest("input, button, label, a")) return;
-    const rect = content.getBoundingClientRect();
-    canSwipe = e.clientX >= rect.right - RIGHT_EDGE_SWIPE_START || open;
+    canSwipe = true;
     if (!canSwipe) return;
     startX = e.clientX;
     startY = e.clientY;
@@ -153,20 +154,28 @@ function wireSwipe(content, onDelete) {
     const delta = e.clientX - startX;
     content.releasePointerCapture(e.pointerId);
 
-    if (delta < -42) {
+    if (delta < -TASK_ACTION_TRIGGER) {
       setShift(-SWIPE_ACTIONS_WIDTH);
       open = true;
+      canSwipe = false;
       return;
     }
 
     if (delta > 20 && open) {
       close();
+      canSwipe = false;
       return;
     }
 
-    if (!open) {
-      close();
+    if (delta > HISTORY_SWIPE_FROM_ITEM_TRIGGER && !open) {
+      if (typeof onSwipeRight === "function") {
+        onSwipeRight();
+      }
+      canSwipe = false;
+      return;
     }
+
+    close();
     canSwipe = false;
   }
 
@@ -194,7 +203,7 @@ function installEdgeHistorySwipe() {
 
   function onPointerDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (e.target.closest("input, button, dialog, .swipe-item")) return;
+    if (e.target.closest("input, button, dialog")) return;
     if (e.clientX > HISTORY_EDGE_START) return;
     tracking = true;
     startX = e.clientX;
@@ -306,15 +315,22 @@ function createTodoItem(todo, index) {
   content.append(inner);
   li.append(actions, content);
 
-  const swipe = wireSwipe(content, () => {
-    state.todos.splice(index, 1);
-    if (state.editingIndex === index) {
-      state.editingIndex = -1;
-    } else if (state.editingIndex > index) {
-      state.editingIndex -= 1;
-    }
-    render();
-    saveState();
+  const swipe = wireSwipe(content, {
+    onDelete: () => {
+      state.todos.splice(index, 1);
+      if (state.editingIndex === index) {
+        state.editingIndex = -1;
+      } else if (state.editingIndex > index) {
+        state.editingIndex -= 1;
+      }
+      render();
+      saveState();
+    },
+    onSwipeRight: () => {
+      if (historyView.classList.contains("hidden")) {
+        setView("history");
+      }
+    },
   });
 
   deleteBtn.addEventListener("click", swipe.remove);
