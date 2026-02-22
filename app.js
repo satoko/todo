@@ -396,7 +396,10 @@ function render() {
   if (state.todos.length === 0) {
     renderEmpty(todoList, "Todoはありません");
   } else {
-    state.todos.forEach((todo, index) => {
+    const todosByNewest = state.todos
+      .map((todo, index) => ({ todo, index }))
+      .reverse();
+    todosByNewest.forEach(({ todo, index }) => {
       todoList.append(createTodoItem(todo, index));
     });
   }
