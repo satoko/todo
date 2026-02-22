@@ -259,6 +259,9 @@ function installTodoReorder(li, content, stateIndex) {
     window.addEventListener("pointermove", onPointerMove, { passive: false });
     window.addEventListener("pointerup", onPointerEnd);
     window.addEventListener("pointercancel", onPointerCancel);
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd);
+    window.addEventListener("touchcancel", onTouchEnd);
   }
 
   function stopWindowTracking() {
@@ -267,6 +270,9 @@ function installTodoReorder(li, content, stateIndex) {
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", onPointerEnd);
     window.removeEventListener("pointercancel", onPointerCancel);
+    window.removeEventListener("touchmove", onTouchMove);
+    window.removeEventListener("touchend", onTouchEnd);
+    window.removeEventListener("touchcancel", onTouchEnd);
   }
 
   function maybeAutoScroll(clientY) {
@@ -426,6 +432,30 @@ function installTodoReorder(li, content, stateIndex) {
 
   function onPointerCancel(e) {
     if (pointerId !== e.pointerId) return;
+    clearPressTimer();
+    if (dragActive) {
+      finishDrag();
+    }
+    stopWindowTracking();
+    document.body.classList.remove("todo-drag-pending");
+    pointerId = null;
+    pendingTodoDragPointerId = null;
+  }
+
+  function onTouchMove(e) {
+    if (pointerId === null) return;
+    if (e.cancelable) {
+      e.preventDefault();
+    }
+    if (!dragActive) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    lastClientY = touch.clientY;
+    updateDraggedPosition(touch.clientY);
+  }
+
+  function onTouchEnd() {
+    if (pointerId === null) return;
     clearPressTimer();
     if (dragActive) {
       finishDrag();
