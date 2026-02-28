@@ -42,6 +42,11 @@ const TODO_DRAG_LONG_PRESS_MS = 320;
 const TODO_DRAG_CANCEL_DISTANCE = 18;
 const TODO_DRAG_AUTOSCROLL_EDGE = 56;
 const TODO_DRAG_AUTOSCROLL_STEP = 10;
+const TONE_CLASS_PREFIX = "tone-";
+const TONE_CYCLE_COUNT = 5;
+const DOUBLE_TAP_INTERVAL_MS = 320;
+const DOUBLE_TAP_MAX_MOVE = 18;
+const TODO_VISIBLE_ROWS = 10;
 const TodoCore = window.TodoCore;
 
 const state = {
@@ -52,6 +57,67 @@ const state = {
 let isTrackingViewport = false;
 let activeTodoDragPointerId = null;
 let pendingTodoDragPointerId = null;
+
+function normalizeTone(value) {
+  return Number.isInteger(value) && value >= 0 && value < TONE_CYCLE_COUNT ? value : 0;
+}
+
+function setContentToneClass(content, tone) {
+  for (let i = 0; i < TONE_CYCLE_COUNT; i += 1) {
+    content.classList.remove(`${TONE_CLASS_PREFIX}${i}`);
+  }
+  content.classList.add(`${TONE_CLASS_PREFIX}${normalizeTone(tone)}`);
+}
+
+function installToneCycleGesture(content, onCycle) {
+  let downX = 0;
+  let downY = 0;
+  let downAt = 0;
+  let pointerActive = false;
+  let lastTapAt = 0;
+  let lastTapX = 0;
+  let lastTapY = 0;
+
+  content.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (e.target.closest("input, button, label, a")) return;
+    pointerActive = true;
+    downX = e.clientX;
+    downY = e.clientY;
+    downAt = Date.now();
+  });
+
+  content.addEventListener("pointerup", (e) => {
+    if (!pointerActive) return;
+    pointerActive = false;
+    if (e.target.closest("input, button, label, a")) return;
+    const move = Math.hypot(e.clientX - downX, e.clientY - downY);
+    const pressMs = Date.now() - downAt;
+    if (move > DOUBLE_TAP_MAX_MOVE || pressMs > 320) return;
+
+    const now = Date.now();
+    const nearLastTap = Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) <= DOUBLE_TAP_MAX_MOVE;
+    if (now - lastTapAt <= DOUBLE_TAP_INTERVAL_MS && nearLastTap) {
+      onCycle();
+      lastTapAt = 0;
+      return;
+    }
+    lastTapAt = now;
+    lastTapX = e.clientX;
+    lastTapY = e.clientY;
+  });
+
+  content.addEventListener("pointercancel", () => {
+    pointerActive = false;
+  });
+}
+
+function syncTodoVisibleMask() {
+  const defaultRowHeight = 56;
+  const firstTodoItem = todoList.querySelector('[data-todo-item="1"] .swipe-content-inner');
+  const rowHeight = firstTodoItem ? Math.ceil(firstTodoItem.getBoundingClientRect().height) : defaultRowHeight;
+  todoView.style.maxHeight = `${rowHeight * TODO_VISIBLE_ROWS}px`;
+}
 
 function syncViewportBottomGap() {
   const vv = window.visualViewport;
@@ -543,6 +609,7 @@ function createTodoItem(todo, stateIndex) {
 
   const content = document.createElement("div");
   content.className = "swipe-content";
+  setContentToneClass(content, todo.tone);
 
   const inner = document.createElement("div");
   inner.className = "swipe-content-inner";
@@ -632,6 +699,12 @@ function createTodoItem(todo, stateIndex) {
   });
 
   installTodoReorder(li, content, stateIndex);
+  installToneCycleGesture(content, () => {
+    const nextTone = (normalizeTone(state.todos[stateIndex].tone) + 1) % TONE_CYCLE_COUNT;
+    state.todos[stateIndex].tone = nextTone;
+    render();
+    saveState();
+  });
   deleteBtn.addEventListener("click", swipe.remove);
 
   return li;
@@ -652,6 +725,7 @@ function createHistoryItem(item, index) {
 
   const content = document.createElement("div");
   content.className = "swipe-content";
+  setContentToneClass(content, item.tone);
 
   const inner = document.createElement("div");
   inner.className = "swipe-content-inner";
@@ -676,6 +750,12 @@ function createHistoryItem(item, index) {
     },
   });
 
+  installToneCycleGesture(content, () => {
+    const nextTone = (normalizeTone(state.history[index].tone) + 1) % TONE_CYCLE_COUNT;
+    state.history[index].tone = nextTone;
+    render();
+    saveState();
+  });
   deleteBtn.addEventListener("click", swipe.remove);
 
   return li;
@@ -705,6 +785,7 @@ function render() {
   }
 
   updateMoveHistoryButton();
+  syncTodoVisibleMask();
 }
 
 function moveCheckedToHistory() {
@@ -721,7 +802,7 @@ function moveCheckedToHistory() {
   if (checked.length === 0) return;
 
   checked.forEach((todo) => {
-    state.history.unshift({ text: todo.text, movedAt });
+    state.history.unshift({ text: todo.text, movedAt, tone: normalizeTone(todo.tone) });
   });
 
   state.todos = state.todos.filter((todo) => !todo.done);
@@ -980,3 +1061,4 @@ loadState();
 installEdgeHistorySwipe();
 setView("todo");
 render();
+window.addEventListener("resize", syncTodoVisibleMask);

@@ -14,18 +14,38 @@
     return keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
   }
 
+  function isToneValue(value) {
+    return Number.isInteger(value) && value >= 0 && value <= 4;
+  }
+
+  function normalizeTone(value) {
+    return isToneValue(value) ? value : 0;
+  }
+
   function isValidTodoEntry(item, maxTodoText) {
-    if (!isExactObjectKeys(item, ["text", "done"])) return false;
+    if (
+      !isExactObjectKeys(item, ["text", "done"]) &&
+      !isExactObjectKeys(item, ["text", "done", "tone"])
+    ) {
+      return false;
+    }
     if (typeof item.text !== "string" || typeof item.done !== "boolean") return false;
     if (item.text.length === 0 || item.text.length > maxTodoText) return false;
+    if (Object.prototype.hasOwnProperty.call(item, "tone") && !isToneValue(item.tone)) return false;
     return true;
   }
 
   function isValidHistoryEntry(item, maxTodoText) {
-    if (!isExactObjectKeys(item, ["text", "movedAt"])) return false;
+    if (
+      !isExactObjectKeys(item, ["text", "movedAt"]) &&
+      !isExactObjectKeys(item, ["text", "movedAt", "tone"])
+    ) {
+      return false;
+    }
     if (typeof item.text !== "string" || typeof item.movedAt !== "string") return false;
     if (item.text.length === 0 || item.text.length > maxTodoText) return false;
     if (item.movedAt.length === 0 || item.movedAt.length > 40) return false;
+    if (Object.prototype.hasOwnProperty.call(item, "tone") && !isToneValue(item.tone)) return false;
     return true;
   }
 
@@ -41,7 +61,7 @@
     if (state.todos.length >= maxTodos) {
       throw new Error("Todo件数が上限を超えています。");
     }
-    state.todos.push({ text: nextText, done: false });
+    state.todos.push({ text: nextText, done: false, tone: 0 });
     state.editingIndex = -1;
   }
 
@@ -101,8 +121,16 @@
   function getStatePayload(state) {
     return {
       version: DEFAULT_VERSION,
-      todos: state.todos.map((todo) => ({ text: todo.text, done: todo.done })),
-      history: state.history.map((item) => ({ text: item.text, movedAt: item.movedAt })),
+      todos: state.todos.map((todo) => ({
+        text: todo.text,
+        done: todo.done,
+        tone: normalizeTone(todo.tone),
+      })),
+      history: state.history.map((item) => ({
+        text: item.text,
+        movedAt: item.movedAt,
+        tone: normalizeTone(item.tone),
+      })),
     };
   }
 
@@ -129,8 +157,16 @@
   }
 
   function applyImportPayload(state, payload) {
-    state.todos = payload.todos.map((todo) => ({ text: todo.text, done: todo.done }));
-    state.history = payload.history.map((item) => ({ text: item.text, movedAt: item.movedAt }));
+    state.todos = payload.todos.map((todo) => ({
+      text: todo.text,
+      done: todo.done,
+      tone: normalizeTone(todo.tone),
+    }));
+    state.history = payload.history.map((item) => ({
+      text: item.text,
+      movedAt: item.movedAt,
+      tone: normalizeTone(item.tone),
+    }));
     state.editingIndex = -1;
   }
 
