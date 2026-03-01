@@ -657,27 +657,32 @@ async function animateCheckedTodosToHistory(stateIndexes) {
 }
 
 function launchConfettiBurst(originRect) {
-  if (!animationLayer || !originRect) return;
+  if (!animationLayer) return;
   if (isReducedMotionPreferred()) return;
   if (document.visibilityState !== "visible") return;
 
   animationLayer.replaceChildren();
   const colors = ["#fb7185", "#f59e0b", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7"];
-  const startX = originRect.left + originRect.width / 2;
-  const startY = originRect.top + originRect.height / 2;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const startY = -8;
+  const leftX = Math.max(12, viewportWidth * 0.08);
+  const rightX = Math.min(viewportWidth - 12, viewportWidth * 0.92);
 
   for (let i = 0; i < CONFETTI_PARTICLE_COUNT; i += 1) {
     const piece = document.createElement("span");
     piece.className = "confetti-piece";
-    piece.style.left = `${startX}px`;
+    const fromLeft = i % 2 === 0;
+    piece.style.left = `${fromLeft ? leftX : rightX}px`;
     piece.style.top = `${startY}px`;
     piece.style.backgroundColor = colors[i % colors.length];
-    const direction = i % 2 === 0 ? -1 : 1;
-    const spread = 36 + Math.random() * 170;
-    const rise = 150 + Math.random() * 220;
-    piece.style.setProperty("--confetti-dx", `${direction * spread}px`);
+    const horizontalDirection = fromLeft ? 1 : -1;
+    const spread = 20 + Math.random() * 160;
+    const rise = viewportHeight * (0.42 + Math.random() * 0.16);
+    const wobble = (Math.random() - 0.5) * 28;
+    piece.style.setProperty("--confetti-dx", `${horizontalDirection * spread + wobble}px`);
     piece.style.setProperty("--confetti-dy", `${rise}px`);
-    piece.style.setProperty("--confetti-rot", `${(Math.random() * 500 + 120) * direction}deg`);
+    piece.style.setProperty("--confetti-rot", `${(Math.random() * 500 + 120) * horizontalDirection}deg`);
     piece.style.setProperty("--confetti-delay", `${Math.floor(Math.random() * 120)}ms`);
     piece.style.setProperty(
       "--confetti-duration",
