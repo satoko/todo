@@ -202,6 +202,10 @@ body.todo-dragging .swipe-content {
   background: #0f766e;
 }
 
+.swipe-action.restore {
+  background: var(--primary);
+}
+
 .swipe-action.delete {
   background: var(--danger);
 }
