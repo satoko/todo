@@ -1,6 +1,7 @@
 const form = document.querySelector("#todo-form");
 const input = document.querySelector("#todo-input");
 const bgLayer = document.querySelector("#bg-layer");
+const animationLayer = document.querySelector("#animation-layer");
 const todoList = document.querySelector("#todo-list");
 const historyList = document.querySelector("#history-list");
 const addTodoFab = document.querySelector("#add-todo-fab");
@@ -47,6 +48,10 @@ const TONE_CYCLE_COUNT = 5;
 const DOUBLE_TAP_INTERVAL_MS = 320;
 const DOUBLE_TAP_MAX_MOVE = 18;
 const TODO_VISIBLE_ROWS = 10;
+const SEND_BACK_ANIMATION_MS = 400;
+const SEND_BACK_STAGGER_MS = 40;
+const CONFETTI_PARTICLE_COUNT = 18;
+const CONFETTI_BASE_DURATION_MS = 780;
 const TodoCore = window.TodoCore;
 
 const state = {
@@ -57,6 +62,7 @@ const state = {
 let isTrackingViewport = false;
 let activeTodoDragPointerId = null;
 let pendingTodoDragPointerId = null;
+let isHistoryTransferAnimating = false;
 
 function normalizeTone(value) {
   return Number.isInteger(value) && value >= 0 && value < TONE_CYCLE_COUNT ? value : 0;
@@ -584,10 +590,135 @@ function installEdgeHistorySwipe() {
   });
 }
 
+function isReducedMotionPreferred() {
+  if (typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function getCheckedTodoStateIndexes() {
+  return state.todos
+    .map((todo, stateIndex) => (todo.done ? stateIndex : -1))
+    .filter((stateIndex) => stateIndex >= 0);
+}
+
+function getTodoRowsByStateIndexes(stateIndexes) {
+  return stateIndexes
+    .map((stateIndex) => {
+      const row = todoList.querySelector(`[data-todo-item="1"][data-state-index="${stateIndex}"]`);
+      return row instanceof HTMLElement ? row : null;
+    })
+    .filter((row) => row !== null);
+}
+
+function getRowsUnionRect(rows) {
+  if (rows.length === 0) return null;
+  let left = Number.POSITIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  rows.forEach((row) => {
+    const rect = row.getBoundingClientRect();
+    left = Math.min(left, rect.left);
+    top = Math.min(top, rect.top);
+    right = Math.max(right, rect.right);
+    bottom = Math.max(bottom, rect.bottom);
+  });
+  return { left, top, width: right - left, height: bottom - top };
+}
+
+async function animateCheckedTodosToHistory(stateIndexes) {
+  const rows = getTodoRowsByStateIndexes(stateIndexes);
+  const originRect = getRowsUnionRect(rows);
+  if (rows.length === 0 || isReducedMotionPreferred()) {
+    return originRect;
+  }
+
+  rows
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
+    .forEach((row, index) => {
+      row.style.setProperty("--send-back-delay", `${index * SEND_BACK_STAGGER_MS}ms`);
+      row.classList.add("todo-send-back");
+    });
+
+  const totalDelay = SEND_BACK_ANIMATION_MS + Math.max(0, rows.length - 1) * SEND_BACK_STAGGER_MS;
+  await wait(totalDelay + 40);
+  return originRect;
+}
+
+function launchConfettiBurst(originRect) {
+  if (!animationLayer || !originRect) return;
+  if (isReducedMotionPreferred()) return;
+  if (document.visibilityState !== "visible") return;
+
+  animationLayer.replaceChildren();
+  const colors = ["#fb7185", "#f59e0b", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7"];
+  const startX = originRect.left + originRect.width / 2;
+  const startY = originRect.top + originRect.height / 2;
+
+  for (let i = 0; i < CONFETTI_PARTICLE_COUNT; i += 1) {
+    const piece = document.createElement("span");
+    piece.className = "confetti-piece";
+    piece.style.left = `${startX}px`;
+    piece.style.top = `${startY}px`;
+    piece.style.backgroundColor = colors[i % colors.length];
+    const direction = i % 2 === 0 ? -1 : 1;
+    const spread = 24 + Math.random() * 120;
+    const rise = 120 + Math.random() * 180;
+    piece.style.setProperty("--confetti-dx", `${direction * spread}px`);
+    piece.style.setProperty("--confetti-dy", `${rise}px`);
+    piece.style.setProperty("--confetti-rot", `${(Math.random() * 500 + 120) * direction}deg`);
+    piece.style.setProperty("--confetti-delay", `${Math.floor(Math.random() * 120)}ms`);
+    piece.style.setProperty(
+      "--confetti-duration",
+      `${CONFETTI_BASE_DURATION_MS + Math.floor(Math.random() * 160)}ms`,
+    );
+    piece.addEventListener(
+      "animationend",
+      () => {
+        piece.remove();
+      },
+      { once: true },
+    );
+    animationLayer.append(piece);
+  }
+
+  window.setTimeout(() => {
+    if (!animationLayer) return;
+    animationLayer.replaceChildren();
+  }, CONFETTI_BASE_DURATION_MS + 280);
+}
+
+function commitCheckedTodosToHistory(checkedTodos) {
+  const now = new Date();
+  const movedAt = now.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  checkedTodos.forEach((todo) => {
+    state.history.unshift({ text: todo.text, movedAt, tone: normalizeTone(todo.tone) });
+  });
+
+  state.todos = state.todos.filter((todo) => !todo.done);
+  state.editingIndex = -1;
+  render();
+  saveState();
+}
+
 function createTodoItem(todo, stateIndex) {
   const li = document.createElement("li");
   li.className = "swipe-item";
   li.dataset.todoItem = "1";
+  li.dataset.stateIndex = String(stateIndex);
 
   const actions = document.createElement("div");
   actions.className = "swipe-actions";
@@ -788,27 +919,24 @@ function render() {
   syncTodoVisibleMask();
 }
 
-function moveCheckedToHistory() {
-  const now = new Date();
-  const movedAt = now.toLocaleString("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+async function moveCheckedToHistory() {
+  if (isHistoryTransferAnimating) return;
 
-  const checked = state.todos.filter((todo) => todo.done);
-  if (checked.length === 0) return;
+  const checkedIndexes = getCheckedTodoStateIndexes();
+  if (checkedIndexes.length === 0) return;
 
-  checked.forEach((todo) => {
-    state.history.unshift({ text: todo.text, movedAt, tone: normalizeTone(todo.tone) });
-  });
+  const checkedTodos = checkedIndexes.map((stateIndex) => state.todos[stateIndex]).filter(Boolean);
+  if (checkedTodos.length === 0) return;
 
-  state.todos = state.todos.filter((todo) => !todo.done);
-  state.editingIndex = -1;
-  render();
-  saveState();
+  isHistoryTransferAnimating = true;
+  moveHistoryBtn.disabled = true;
+  try {
+    const originRect = await animateCheckedTodosToHistory(checkedIndexes);
+    launchConfettiBurst(originRect);
+    commitCheckedTodosToHistory(checkedTodos);
+  } finally {
+    isHistoryTransferAnimating = false;
+  }
 }
 
 function applyWallpaper(dataUrl) {
@@ -935,7 +1063,9 @@ toggleViewBtn.addEventListener("click", () => {
   const isTodo = historyView.classList.contains("hidden");
   setView(isTodo ? "history" : "todo");
 });
-moveHistoryBtn.addEventListener("click", moveCheckedToHistory);
+moveHistoryBtn.addEventListener("click", () => {
+  void moveCheckedToHistory();
+});
 reloadBtn.addEventListener("click", () => {
   window.location.reload();
 });
