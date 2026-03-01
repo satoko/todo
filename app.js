@@ -1136,20 +1136,25 @@ addTodoDialog.addEventListener("close", () => {
   stopViewportTracking();
 });
 
-categoryTodoBtn.addEventListener("click", () => {
-  state.activeCategory = "todo";
-  setView("history");
+function handleCategoryButtonClick(nextCategory) {
+  if (state.activeCategory === nextCategory) {
+    setView(state.viewMode === "history" ? "list" : "history");
+    render();
+    return;
+  }
+  state.activeCategory = nextCategory;
+  setView("list");
   render();
+}
+
+categoryTodoBtn.addEventListener("click", () => {
+  handleCategoryButtonClick("todo");
 });
 categoryDinnerBtn.addEventListener("click", () => {
-  state.activeCategory = "dinner";
-  setView("history");
-  render();
+  handleCategoryButtonClick("dinner");
 });
 categoryOtherBtn.addEventListener("click", () => {
-  state.activeCategory = "other";
-  setView("history");
-  render();
+  handleCategoryButtonClick("other");
 });
 moveHistoryBtn.addEventListener("click", () => {
   void moveCheckedToHistory();
