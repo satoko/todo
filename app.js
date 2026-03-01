@@ -14,6 +14,7 @@ const categoryTodoBtn = document.querySelector("#category-todo-btn");
 const categoryDinnerBtn = document.querySelector("#category-dinner-btn");
 const categoryOtherBtn = document.querySelector("#category-other-btn");
 const moveHistoryBtn = document.querySelector("#move-history-btn");
+const backToListBtn = document.querySelector("#back-to-list-btn");
 const reloadBtn = document.querySelector("#reload-btn");
 const historyPruneBtn = document.querySelector("#history-prune-btn");
 
@@ -224,6 +225,7 @@ function setView(mode) {
   todoView.classList.toggle("hidden", !isListMode);
   historyView.classList.toggle("hidden", isListMode);
   moveHistoryBtn.classList.toggle("hidden", !isListMode);
+  backToListBtn.classList.toggle("hidden", isListMode);
   historyPruneBtn.classList.toggle("hidden", isListMode);
   addTodoFab.classList.toggle("hidden", !isListMode);
   if (!isListMode && addTodoDialog.open) {
@@ -1151,6 +1153,10 @@ categoryOtherBtn.addEventListener("click", () => {
 });
 moveHistoryBtn.addEventListener("click", () => {
   void moveCheckedToHistory();
+});
+backToListBtn.addEventListener("click", () => {
+  setView("list");
+  render();
 });
 reloadBtn.addEventListener("click", () => {
   window.location.reload();
