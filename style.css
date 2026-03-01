@@ -170,29 +170,39 @@ body.history-mode .bg-layer {
   transform: scale(1.01);
 }
 
-.confetti-piece {
+.task-suck-ghost {
   position: absolute;
-  width: 8px;
-  height: 12px;
-  border-radius: 2px;
-  opacity: 0;
-  transform: translate3d(0, 0, 0) rotate(0deg);
-  animation: confetti-burst var(--confetti-duration, 780ms) cubic-bezier(0.17, 0.84, 0.34, 1) forwards;
-  animation-delay: var(--confetti-delay, 0ms);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.88);
+  color: #334155;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.94;
+  transform: translate3d(0, 0, 0) scale(1);
+  filter: blur(0);
+  animation: task-suck var(--ghost-duration, 520ms) cubic-bezier(0.22, 0.68, 0.2, 1) forwards;
+  animation-delay: var(--ghost-delay, 0ms);
 }
 
-@keyframes confetti-burst {
+@keyframes task-suck {
   0% {
-    opacity: 0;
-    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0.94;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
   }
-  12% {
-    opacity: 1;
+  55% {
+    opacity: 0.78;
   }
   100% {
     opacity: 0;
-    transform: translate3d(var(--confetti-dx, 0px), var(--confetti-dy, 120px), 0)
-      rotate(var(--confetti-rot, 220deg));
+    transform: translate3d(var(--ghost-dx, 0px), var(--ghost-dy, 0px), 0) scale(0.16);
+    filter: blur(1px);
   }
 }
 
@@ -447,7 +457,7 @@ body.todo-dragging .swipe-content {
     filter: none;
   }
 
-  .confetti-piece {
+  .task-suck-ghost {
     animation: none;
     opacity: 0;
   }
