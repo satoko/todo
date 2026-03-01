@@ -291,6 +291,10 @@ body.todo-dragging .swipe-content {
   touch-action: pan-y;
 }
 
+.history .swipe-content {
+  touch-action: manipulation;
+}
+
 .swipe-content.tone-0 {
   background: var(--task-surface);
 }
