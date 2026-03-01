@@ -122,6 +122,7 @@ body {
   backdrop-filter: none;
   padding: 12px;
   border-radius: 14px;
+  touch-action: manipulation;
 }
 
 .hidden {

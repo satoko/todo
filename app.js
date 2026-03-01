@@ -118,6 +118,33 @@ function installToneCycleGesture(content, onCycle) {
   });
 }
 
+function installDoubleTapZoomGuard(container) {
+  let lastTouchEndAt = 0;
+  let lastTouchX = 0;
+  let lastTouchY = 0;
+
+  container.addEventListener(
+    "touchend",
+    (e) => {
+      if (e.touches.length > 0 || e.changedTouches.length === 0) return;
+      if (e.target.closest("input, button, label, a, textarea, select")) return;
+      const touch = e.changedTouches[0];
+      const now = Date.now();
+      const nearLastTouch =
+        Math.hypot(touch.clientX - lastTouchX, touch.clientY - lastTouchY) <= DOUBLE_TAP_MAX_MOVE;
+      if (now - lastTouchEndAt <= DOUBLE_TAP_INTERVAL_MS && nearLastTouch) {
+        e.preventDefault();
+        lastTouchEndAt = 0;
+        return;
+      }
+      lastTouchEndAt = now;
+      lastTouchX = touch.clientX;
+      lastTouchY = touch.clientY;
+    },
+    { passive: false }
+  );
+}
+
 function syncTodoVisibleMask() {
   if (todoView.classList.contains("hidden")) return;
   const defaultRowHeight = 56;
@@ -1194,6 +1221,7 @@ if (savedWallpaper) {
   applyWallpaper(savedWallpaper);
 }
 
+installDoubleTapZoomGuard(historyView);
 loadState();
 installEdgeHistorySwipe();
 setView("todo");
