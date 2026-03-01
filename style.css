@@ -198,13 +198,13 @@ body.history-mode .bg-layer {
   }
   18% {
     opacity: 0.98;
-    transform: translate3d(0, 0, 0) scale(1.08);
+    transform: translate3d(0, 0, 0) scale(1.3);
     filter: blur(0);
   }
   45% {
     opacity: 0.84;
     transform: translate3d(calc(var(--ghost-dx, 0px) * 0.28), calc(var(--ghost-dy, 0px) * 0.28), 0)
-      scale(0.95);
+      scale(1.02);
   }
   100% {
     opacity: 0;
