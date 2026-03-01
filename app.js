@@ -113,9 +113,11 @@ function installToneCycleGesture(content, onCycle) {
 }
 
 function syncTodoVisibleMask() {
+  if (todoView.classList.contains("hidden")) return;
   const defaultRowHeight = 56;
   const firstTodoItem = todoList.querySelector('[data-todo-item="1"] .swipe-content-inner');
-  const rowHeight = firstTodoItem ? Math.ceil(firstTodoItem.getBoundingClientRect().height) : defaultRowHeight;
+  const measuredHeight = firstTodoItem ? Math.ceil(firstTodoItem.getBoundingClientRect().height) : 0;
+  const rowHeight = measuredHeight > 0 ? measuredHeight : defaultRowHeight;
   todoView.style.maxHeight = `${rowHeight * TODO_VISIBLE_ROWS}px`;
 }
 
@@ -165,6 +167,9 @@ function setView(mode) {
     addTodoDialog.close();
   }
   document.body.classList.toggle("history-mode", !isTodo);
+  if (isTodo) {
+    requestAnimationFrame(syncTodoVisibleMask);
+  }
 }
 
 function renderEmpty(listEl, message) {
