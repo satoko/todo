@@ -48,10 +48,9 @@ const TONE_CYCLE_COUNT = 5;
 const DOUBLE_TAP_INTERVAL_MS = 320;
 const DOUBLE_TAP_MAX_MOVE = 18;
 const TODO_VISIBLE_ROWS = 10;
-const SEND_BACK_ANIMATION_MS = 400;
 const SEND_BACK_STAGGER_MS = 40;
-const CONFETTI_PARTICLE_COUNT = 180;
-const CONFETTI_BASE_DURATION_MS = 780;
+const TASK_SUCK_ANIMATION_MS = 520;
+const HAPTIC_DELAY_MS = 200;
 const TodoCore = window.TodoCore;
 
 const state = {
@@ -621,87 +620,64 @@ function getTodoRowsByStateIndexes(stateIndexes) {
     .filter((row) => row !== null);
 }
 
-function getRowsUnionRect(rows) {
-  if (rows.length === 0) return null;
-  let left = Number.POSITIVE_INFINITY;
-  let top = Number.POSITIVE_INFINITY;
-  let right = Number.NEGATIVE_INFINITY;
-  let bottom = Number.NEGATIVE_INFINITY;
-  rows.forEach((row) => {
-    const rect = row.getBoundingClientRect();
-    left = Math.min(left, rect.left);
-    top = Math.min(top, rect.top);
-    right = Math.max(right, rect.right);
-    bottom = Math.max(bottom, rect.bottom);
-  });
-  return { left, top, width: right - left, height: bottom - top };
-}
-
 async function animateCheckedTodosToHistory(stateIndexes) {
   const rows = getTodoRowsByStateIndexes(stateIndexes);
-  const originRect = getRowsUnionRect(rows);
+  const targetRect = toggleViewBtn.getBoundingClientRect();
   if (rows.length === 0 || isReducedMotionPreferred()) {
-    return originRect;
+    return;
   }
 
+  if (animationLayer) {
+    animationLayer.replaceChildren();
+  }
+
+  const targetCenterX = targetRect.left + targetRect.width / 2;
+  const targetCenterY = targetRect.top + targetRect.height / 2;
   rows
     .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top)
     .forEach((row, index) => {
       row.style.setProperty("--send-back-delay", `${index * SEND_BACK_STAGGER_MS}ms`);
       row.classList.add("todo-send-back");
+
+      if (!animationLayer) return;
+      const rowRect = row.getBoundingClientRect();
+      const rowCenterX = rowRect.left + rowRect.width / 2;
+      const rowCenterY = rowRect.top + rowRect.height / 2;
+      const ghost = document.createElement("div");
+      ghost.className = "task-suck-ghost";
+      const textNode = row.querySelector(".todo-text");
+      ghost.textContent = textNode ? textNode.textContent || "" : "";
+      ghost.style.left = `${rowRect.left}px`;
+      ghost.style.top = `${rowRect.top}px`;
+      ghost.style.width = `${rowRect.width}px`;
+      ghost.style.height = `${rowRect.height}px`;
+      ghost.style.setProperty("--ghost-dx", `${targetCenterX - rowCenterX}px`);
+      ghost.style.setProperty("--ghost-dy", `${targetCenterY - rowCenterY}px`);
+      ghost.style.setProperty("--ghost-delay", `${index * SEND_BACK_STAGGER_MS}ms`);
+      ghost.style.setProperty("--ghost-duration", `${TASK_SUCK_ANIMATION_MS}ms`);
+      ghost.addEventListener(
+        "animationend",
+        () => {
+          ghost.remove();
+        },
+        { once: true },
+      );
+      animationLayer.append(ghost);
     });
 
-  const totalDelay = SEND_BACK_ANIMATION_MS + Math.max(0, rows.length - 1) * SEND_BACK_STAGGER_MS;
+  const totalDelay = TASK_SUCK_ANIMATION_MS + Math.max(0, rows.length - 1) * SEND_BACK_STAGGER_MS;
   await wait(totalDelay + 40);
-  return originRect;
+  if (animationLayer) {
+    animationLayer.replaceChildren();
+  }
 }
 
-function launchConfettiBurst(originRect) {
-  if (!animationLayer) return;
-  if (isReducedMotionPreferred()) return;
-  if (document.visibilityState !== "visible") return;
-
-  animationLayer.replaceChildren();
-  const colors = ["#fb7185", "#f59e0b", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7"];
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const startY = -8;
-  const leftX = Math.max(12, viewportWidth * 0.08);
-  const rightX = Math.min(viewportWidth - 12, viewportWidth * 0.92);
-
-  for (let i = 0; i < CONFETTI_PARTICLE_COUNT; i += 1) {
-    const piece = document.createElement("span");
-    piece.className = "confetti-piece";
-    const fromLeft = i % 2 === 0;
-    piece.style.left = `${fromLeft ? leftX : rightX}px`;
-    piece.style.top = `${startY}px`;
-    piece.style.backgroundColor = colors[i % colors.length];
-    const horizontalDirection = fromLeft ? 1 : -1;
-    const spread = 20 + Math.random() * 160;
-    const rise = viewportHeight * (0.42 + Math.random() * 0.16);
-    const wobble = (Math.random() - 0.5) * 28;
-    piece.style.setProperty("--confetti-dx", `${horizontalDirection * spread + wobble}px`);
-    piece.style.setProperty("--confetti-dy", `${rise}px`);
-    piece.style.setProperty("--confetti-rot", `${(Math.random() * 500 + 120) * horizontalDirection}deg`);
-    piece.style.setProperty("--confetti-delay", `${Math.floor(Math.random() * 120)}ms`);
-    piece.style.setProperty(
-      "--confetti-duration",
-      `${CONFETTI_BASE_DURATION_MS + Math.floor(Math.random() * 160)}ms`,
-    );
-    piece.addEventListener(
-      "animationend",
-      () => {
-        piece.remove();
-      },
-      { once: true },
-    );
-    animationLayer.append(piece);
-  }
-
+function scheduleLightHaptic() {
   window.setTimeout(() => {
-    if (!animationLayer) return;
-    animationLayer.replaceChildren();
-  }, CONFETTI_BASE_DURATION_MS + 280);
+    if (typeof navigator.vibrate === "function") {
+      navigator.vibrate(12);
+    }
+  }, HAPTIC_DELAY_MS);
 }
 
 function commitCheckedTodosToHistory(checkedTodos) {
@@ -959,8 +935,10 @@ async function moveCheckedToHistory() {
   isHistoryTransferAnimating = true;
   moveHistoryBtn.disabled = true;
   try {
-    const originRect = await animateCheckedTodosToHistory(checkedIndexes);
-    launchConfettiBurst(originRect);
+    if (document.visibilityState === "visible") {
+      scheduleLightHaptic();
+    }
+    await animateCheckedTodosToHistory(checkedIndexes);
     commitCheckedTodosToHistory(checkedTodos);
   } finally {
     isHistoryTransferAnimating = false;
