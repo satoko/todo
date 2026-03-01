@@ -1136,14 +1136,17 @@ addTodoDialog.addEventListener("close", () => {
 
 categoryTodoBtn.addEventListener("click", () => {
   state.activeCategory = "todo";
+  setView("history");
   render();
 });
 categoryDinnerBtn.addEventListener("click", () => {
   state.activeCategory = "dinner";
+  setView("history");
   render();
 });
 categoryOtherBtn.addEventListener("click", () => {
   state.activeCategory = "other";
+  setView("history");
   render();
 });
 moveHistoryBtn.addEventListener("click", () => {
