@@ -50,7 +50,7 @@ const DOUBLE_TAP_MAX_MOVE = 18;
 const TODO_VISIBLE_ROWS = 10;
 const SEND_BACK_ANIMATION_MS = 400;
 const SEND_BACK_STAGGER_MS = 40;
-const CONFETTI_PARTICLE_COUNT = 18;
+const CONFETTI_PARTICLE_COUNT = 180;
 const CONFETTI_BASE_DURATION_MS = 780;
 const TodoCore = window.TodoCore;
 
@@ -668,8 +668,8 @@ function launchConfettiBurst(originRect) {
     piece.style.top = `${startY}px`;
     piece.style.backgroundColor = colors[i % colors.length];
     const direction = i % 2 === 0 ? -1 : 1;
-    const spread = 24 + Math.random() * 120;
-    const rise = 120 + Math.random() * 180;
+    const spread = 36 + Math.random() * 170;
+    const rise = 150 + Math.random() * 220;
     piece.style.setProperty("--confetti-dx", `${direction * spread}px`);
     piece.style.setProperty("--confetti-dy", `${rise}px`);
     piece.style.setProperty("--confetti-rot", `${(Math.random() * 500 + 120) * direction}deg`);
