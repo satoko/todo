@@ -103,6 +103,7 @@ function installToneCycleGesture(content, onCycle) {
     const now = Date.now();
     const nearLastTap = Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) <= DOUBLE_TAP_MAX_MOVE;
     if (now - lastTapAt <= DOUBLE_TAP_INTERVAL_MS && nearLastTap) {
+      e.preventDefault();
       onCycle();
       lastTapAt = 0;
       return;
