@@ -303,10 +303,6 @@ body.todo-dragging .swipe-content {
 }
 
 .swipe-content.tone-3 {
-  background: rgba(255, 133, 214, 0.72);
-}
-
-.swipe-content.tone-4 {
   background: rgba(161, 170, 183, 0.72);
 }
 
