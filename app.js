@@ -10,7 +10,9 @@ const closeAddTodoBtn = document.querySelector("#close-add-todo-btn");
 
 const todoView = document.querySelector("#todo-view");
 const historyView = document.querySelector("#history-view");
-const toggleViewBtn = document.querySelector("#toggle-view-btn");
+const categoryTodoBtn = document.querySelector("#category-todo-btn");
+const categoryDinnerBtn = document.querySelector("#category-dinner-btn");
+const categoryOtherBtn = document.querySelector("#category-other-btn");
 const moveHistoryBtn = document.querySelector("#move-history-btn");
 const reloadBtn = document.querySelector("#reload-btn");
 const historyPruneBtn = document.querySelector("#history-prune-btn");
@@ -28,7 +30,8 @@ const historyCutoffInput = document.querySelector("#history-cutoff-input");
 const historyDeleteCancelBtn = document.querySelector("#history-delete-cancel-btn");
 
 const STORAGE_KEY = "todo_wallpaper";
-const STATE_STORAGE_KEY = "todo_state_v1";
+const STATE_STORAGE_KEY = "todo_state_v2";
+const LEGACY_STATE_STORAGE_KEY = "todo_state_v1";
 const MAX_TODO_TEXT = 200;
 const MAX_TODOS = 1000;
 const MAX_HISTORY = 3000;
@@ -38,7 +41,6 @@ const SWIPE_ACTIONS_WIDTH = 172;
 const TASK_ACTION_TRIGGER = 5;
 const HISTORY_EDGE_START = 10000;
 const HISTORY_EDGE_TRIGGER = 14;
-const HISTORY_SWIPE_FROM_ITEM_TRIGGER = 12;
 const TODO_DRAG_LONG_PRESS_MS = 320;
 const TODO_DRAG_CANCEL_DISTANCE = 18;
 const TODO_DRAG_AUTOSCROLL_EDGE = 56;
@@ -52,16 +54,44 @@ const SEND_BACK_STAGGER_MS = 40;
 const TASK_SUCK_ANIMATION_MS = 520;
 const HAPTIC_DELAY_MS = 200;
 const TodoCore = window.TodoCore;
+const CATEGORY_ORDER = ["todo", "dinner", "other"];
 
 const state = {
-  todos: [],
-  history: [],
-  editingIndex: -1,
+  categories: createEmptyCategories(),
+  activeCategory: "todo",
+  viewMode: "list",
 };
+
+const categoryButtons = {
+  todo: categoryTodoBtn,
+  dinner: categoryDinnerBtn,
+  other: categoryOtherBtn,
+};
+
 let isTrackingViewport = false;
 let activeTodoDragPointerId = null;
 let pendingTodoDragPointerId = null;
 let isHistoryTransferAnimating = false;
+
+function createEmptyBucket() {
+  return { todos: [], history: [], editingIndex: -1 };
+}
+
+function createEmptyCategories() {
+  return {
+    todo: createEmptyBucket(),
+    dinner: createEmptyBucket(),
+    other: createEmptyBucket(),
+  };
+}
+
+function getCategoryBucket(categoryKey) {
+  return state.categories[categoryKey] || state.categories.todo;
+}
+
+function getActiveBucket() {
+  return getCategoryBucket(state.activeCategory);
+}
 
 function normalizeTone(value) {
   return Number.isInteger(value) && value >= 0 && value < TONE_CYCLE_COUNT ? value : 0;
@@ -189,20 +219,34 @@ function stopViewportTracking() {
 }
 
 function setView(mode) {
-  const isTodo = mode === "todo";
-  todoView.classList.toggle("hidden", !isTodo);
-  historyView.classList.toggle("hidden", isTodo);
-  toggleViewBtn.textContent = isTodo ? "Todo" : "履歴";
-  moveHistoryBtn.classList.toggle("hidden", !isTodo);
-  historyPruneBtn.classList.toggle("hidden", isTodo);
-  addTodoFab.classList.toggle("hidden", !isTodo);
-  if (!isTodo && addTodoDialog.open) {
+  state.viewMode = mode === "history" ? "history" : "list";
+  const isListMode = state.viewMode === "list";
+  todoView.classList.toggle("hidden", !isListMode);
+  historyView.classList.toggle("hidden", isListMode);
+  moveHistoryBtn.classList.toggle("hidden", !isListMode);
+  historyPruneBtn.classList.toggle("hidden", isListMode);
+  addTodoFab.classList.toggle("hidden", !isListMode);
+  if (!isListMode && addTodoDialog.open) {
     addTodoDialog.close();
   }
-  document.body.classList.toggle("history-mode", !isTodo);
-  if (isTodo) {
+  document.body.classList.toggle("history-mode", !isListMode);
+  if (isListMode) {
     requestAnimationFrame(syncTodoVisibleMask);
   }
+}
+
+function syncCategoryButtons() {
+  CATEGORY_ORDER.forEach((key) => {
+    const button = categoryButtons[key];
+    if (!button) return;
+    button.classList.toggle("active", key === state.activeCategory);
+  });
+}
+
+function getCurrentCategoryButtonRect() {
+  const activeButton = categoryButtons[state.activeCategory];
+  if (!activeButton) return null;
+  return activeButton.getBoundingClientRect();
 }
 
 function renderEmpty(listEl, message) {
@@ -213,13 +257,14 @@ function renderEmpty(listEl, message) {
 }
 
 function updateMoveHistoryButton() {
-  const checkedCount = state.todos.filter((todo) => todo.done).length;
+  const bucket = getActiveBucket();
+  const checkedCount = bucket.todos.filter((todo) => todo.done).length;
   moveHistoryBtn.textContent = checkedCount > 0 ? `${checkedCount}件を履歴へ移動` : "履歴へ移動";
   moveHistoryBtn.disabled = checkedCount === 0;
 }
 
 function wireSwipe(content, handlers) {
-  const { onDelete, onSwipeRight, actionWidth = SWIPE_ACTIONS_WIDTH } = handlers;
+  const { onDelete, actionWidth = SWIPE_ACTIONS_WIDTH } = handlers;
   const row = content.closest(".swipe-item");
   let startX = 0;
   let startY = 0;
@@ -298,14 +343,6 @@ function wireSwipe(content, handlers) {
       return;
     }
 
-    if (delta > HISTORY_SWIPE_FROM_ITEM_TRIGGER && !open) {
-      if (typeof onSwipeRight === "function") {
-        onSwipeRight();
-      }
-      canSwipe = false;
-      return;
-    }
-
     close();
     canSwipe = false;
   }
@@ -327,8 +364,8 @@ function wireSwipe(content, handlers) {
   };
 }
 
-function getStateIndexFromVisualIndex(visualIndex) {
-  return state.todos.length - 1 - visualIndex;
+function getStateIndexFromVisualIndex(bucket, visualIndex) {
+  return bucket.todos.length - 1 - visualIndex;
 }
 
 function installTodoReorder(li, content, stateIndex) {
@@ -341,7 +378,8 @@ function installTodoReorder(li, content, stateIndex) {
   let startY = 0;
   let lastClientY = 0;
   let windowTracking = false;
-  const fromVisualIndex = state.todos.length - 1 - stateIndex;
+  const bucket = getActiveBucket();
+  const fromVisualIndex = bucket.todos.length - 1 - stateIndex;
 
   function clearPressTimer() {
     if (!pressTimerId) return;
@@ -415,7 +453,7 @@ function installTodoReorder(li, content, stateIndex) {
   }
 
   function startDrag(clientY) {
-    if (dragActive || pointerId === null || state.editingIndex !== -1) return;
+    if (dragActive || pointerId === null || bucket.editingIndex !== -1) return;
     dragActive = true;
     pendingTodoDragPointerId = null;
     activeTodoDragPointerId = pointerId;
@@ -458,9 +496,9 @@ function installTodoReorder(li, content, stateIndex) {
       if (toVisualIndex >= 0 && toVisualIndex !== fromVisualIndex) {
         try {
           TodoCore.moveTodo(
-            state,
-            getStateIndexFromVisualIndex(fromVisualIndex),
-            getStateIndexFromVisualIndex(toVisualIndex),
+            bucket,
+            getStateIndexFromVisualIndex(bucket, fromVisualIndex),
+            getStateIndexFromVisualIndex(bucket, toVisualIndex),
           );
           render();
           saveState();
@@ -486,7 +524,7 @@ function installTodoReorder(li, content, stateIndex) {
 
   function onPointerDown(e) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    if (state.editingIndex !== -1) return;
+    if (bucket.editingIndex !== -1) return;
     if (e.target.closest("input, button, label, a")) return;
     pointerId = e.pointerId;
     pendingTodoDragPointerId = pointerId;
@@ -609,9 +647,9 @@ function installEdgeHistorySwipe() {
     tracking = false;
     const deltaX = e.clientX - startX;
     const deltaY = e.clientY - startY;
-    if (deltaX > HISTORY_EDGE_TRIGGER && Math.abs(deltaX) > Math.abs(deltaY) * 0.45) {
-      const isTodo = historyView.classList.contains("hidden");
-      setView(isTodo ? "history" : "todo");
+    if (deltaX < -HISTORY_EDGE_TRIGGER && Math.abs(deltaX) > Math.abs(deltaY) * 0.45) {
+      const isListMode = state.viewMode === "list";
+      setView(isListMode ? "history" : "list");
     }
   }
 
@@ -634,7 +672,8 @@ function wait(ms) {
 }
 
 function getCheckedTodoStateIndexes() {
-  return state.todos
+  const bucket = getActiveBucket();
+  return bucket.todos
     .map((todo, stateIndex) => (todo.done ? stateIndex : -1))
     .filter((stateIndex) => stateIndex >= 0);
 }
@@ -650,8 +689,8 @@ function getTodoRowsByStateIndexes(stateIndexes) {
 
 async function animateCheckedTodosToHistory(stateIndexes) {
   const rows = getTodoRowsByStateIndexes(stateIndexes);
-  const targetRect = toggleViewBtn.getBoundingClientRect();
-  if (rows.length === 0 || isReducedMotionPreferred()) {
+  const targetRect = getCurrentCategoryButtonRect();
+  if (rows.length === 0 || isReducedMotionPreferred() || !targetRect) {
     return;
   }
 
@@ -708,7 +747,7 @@ function scheduleLightHaptic() {
   }, HAPTIC_DELAY_MS);
 }
 
-function commitCheckedTodosToHistory(checkedTodos) {
+function commitCheckedTodosToHistory(checkedTodos, bucket) {
   const now = new Date();
   const movedAt = now.toLocaleString("ja-JP", {
     year: "numeric",
@@ -719,16 +758,17 @@ function commitCheckedTodosToHistory(checkedTodos) {
   });
 
   checkedTodos.forEach((todo) => {
-    state.history.unshift({ text: todo.text, movedAt, tone: normalizeTone(todo.tone) });
+    bucket.history.unshift({ text: todo.text, movedAt, tone: normalizeTone(todo.tone) });
   });
 
-  state.todos = state.todos.filter((todo) => !todo.done);
-  state.editingIndex = -1;
+  bucket.todos = bucket.todos.filter((todo) => !todo.done);
+  bucket.editingIndex = -1;
   render();
   saveState();
 }
 
 function createTodoItem(todo, stateIndex) {
+  const bucket = getActiveBucket();
   const li = document.createElement("li");
   li.className = "swipe-item";
   li.dataset.todoItem = "1";
@@ -742,7 +782,7 @@ function createTodoItem(todo, stateIndex) {
   editBtn.className = "swipe-action edit";
   editBtn.textContent = "編集";
   editBtn.addEventListener("click", () => {
-    state.editingIndex = stateIndex;
+    bucket.editingIndex = stateIndex;
     render();
   });
 
@@ -767,12 +807,12 @@ function createTodoItem(todo, stateIndex) {
   checkbox.type = "checkbox";
   checkbox.checked = todo.done;
   checkbox.addEventListener("change", () => {
-    state.todos[stateIndex].done = checkbox.checked;
+    bucket.todos[stateIndex].done = checkbox.checked;
     render();
     saveState();
   });
 
-  if (state.editingIndex === stateIndex) {
+  if (bucket.editingIndex === stateIndex) {
     const editInput = document.createElement("input");
     editInput.type = "text";
     editInput.className = "todo-edit-input";
@@ -786,7 +826,7 @@ function createTodoItem(todo, stateIndex) {
     saveBtn.textContent = "保存";
     saveBtn.addEventListener("click", () => {
       try {
-        TodoCore.updateTodoText(state, stateIndex, editInput.value, { maxTodoText: MAX_TODO_TEXT });
+        TodoCore.updateTodoText(bucket, stateIndex, editInput.value, { maxTodoText: MAX_TODO_TEXT });
         render();
         saveState();
       } catch (error) {
@@ -799,7 +839,7 @@ function createTodoItem(todo, stateIndex) {
     cancelBtn.className = "small-btn";
     cancelBtn.textContent = "キャンセル";
     cancelBtn.addEventListener("click", () => {
-      state.editingIndex = -1;
+      bucket.editingIndex = -1;
       render();
     });
 
@@ -829,24 +869,19 @@ function createTodoItem(todo, stateIndex) {
   const swipe = wireSwipe(content, {
     onDelete: () => {
       try {
-        TodoCore.deleteTodo(state, stateIndex);
+        TodoCore.deleteTodo(bucket, stateIndex);
         render();
         saveState();
       } catch (error) {
         alert(error instanceof Error ? error.message : "削除に失敗しました。");
       }
     },
-    onSwipeRight: () => {
-      if (historyView.classList.contains("hidden")) {
-        setView("history");
-      }
-    },
   });
 
   installTodoReorder(li, content, stateIndex);
   installToneCycleGesture(content, () => {
-    const nextTone = (normalizeTone(state.todos[stateIndex].tone) + 1) % TONE_CYCLE_COUNT;
-    state.todos[stateIndex].tone = nextTone;
+    const nextTone = (normalizeTone(bucket.todos[stateIndex].tone) + 1) % TONE_CYCLE_COUNT;
+    bucket.todos[stateIndex].tone = nextTone;
     render();
     saveState();
   });
@@ -856,6 +891,7 @@ function createTodoItem(todo, stateIndex) {
 }
 
 function createHistoryItem(item, index) {
+  const bucket = getActiveBucket();
   const li = document.createElement("li");
   li.className = "swipe-item";
 
@@ -894,25 +930,25 @@ function createHistoryItem(item, index) {
   const swipe = wireSwipe(content, {
     actionWidth: SWIPE_ACTIONS_WIDTH,
     onDelete: () => {
-      state.history.splice(index, 1);
+      bucket.history.splice(index, 1);
       render();
       saveState();
     },
   });
 
   installToneCycleGesture(content, () => {
-    const nextTone = (normalizeTone(state.history[index].tone) + 1) % TONE_CYCLE_COUNT;
-    state.history[index].tone = nextTone;
+    const nextTone = (normalizeTone(bucket.history[index].tone) + 1) % TONE_CYCLE_COUNT;
+    bucket.history[index].tone = nextTone;
     render();
     saveState();
   });
   restoreBtn.addEventListener("click", () => {
-    const historyItem = state.history[index];
+    const historyItem = bucket.history[index];
     if (!historyItem) return;
     try {
-      TodoCore.addTodo(state, historyItem.text, { maxTodoText: MAX_TODO_TEXT, maxTodos: MAX_TODOS });
-      state.todos[state.todos.length - 1].tone = normalizeTone(historyItem.tone);
-      state.history.splice(index, 1);
+      TodoCore.addTodo(bucket, historyItem.text, { maxTodoText: MAX_TODO_TEXT, maxTodos: MAX_TODOS });
+      bucket.todos[bucket.todos.length - 1].tone = normalizeTone(historyItem.tone);
+      bucket.history.splice(index, 1);
       render();
       saveState();
     } catch (error) {
@@ -925,13 +961,14 @@ function createHistoryItem(item, index) {
 }
 
 function render() {
+  const bucket = getActiveBucket();
   todoList.innerHTML = "";
   historyList.innerHTML = "";
 
-  if (state.todos.length === 0) {
+  if (bucket.todos.length === 0) {
     renderEmpty(todoList, "Todoはありません");
   } else {
-    const todosByNewest = state.todos
+    const todosByNewest = bucket.todos
       .map((todo, stateIndex) => ({ todo, stateIndex }))
       .reverse();
     todosByNewest.forEach(({ todo, stateIndex }) => {
@@ -939,14 +976,15 @@ function render() {
     });
   }
 
-  if (state.history.length === 0) {
+  if (bucket.history.length === 0) {
     renderEmpty(historyList, "履歴はありません");
   } else {
-    state.history.forEach((item, index) => {
+    bucket.history.forEach((item, index) => {
       historyList.append(createHistoryItem(item, index));
     });
   }
 
+  syncCategoryButtons();
   updateMoveHistoryButton();
   syncTodoVisibleMask();
 }
@@ -957,7 +995,8 @@ async function moveCheckedToHistory() {
   const checkedIndexes = getCheckedTodoStateIndexes();
   if (checkedIndexes.length === 0) return;
 
-  const checkedTodos = checkedIndexes.map((stateIndex) => state.todos[stateIndex]).filter(Boolean);
+  const bucket = getActiveBucket();
+  const checkedTodos = checkedIndexes.map((stateIndex) => bucket.todos[stateIndex]).filter(Boolean);
   if (checkedTodos.length === 0) return;
 
   isHistoryTransferAnimating = true;
@@ -967,7 +1006,7 @@ async function moveCheckedToHistory() {
       scheduleLightHaptic();
     }
     await animateCheckedTodosToHistory(checkedIndexes);
-    commitCheckedTodosToHistory(checkedTodos);
+    commitCheckedTodosToHistory(checkedTodos, bucket);
   } finally {
     isHistoryTransferAnimating = false;
   }
@@ -1013,7 +1052,7 @@ function saveState() {
 }
 
 function loadState() {
-  const raw = localStorage.getItem(STATE_STORAGE_KEY);
+  const raw = localStorage.getItem(STATE_STORAGE_KEY) || localStorage.getItem(LEGACY_STATE_STORAGE_KEY);
   if (!raw) return;
 
   try {
@@ -1026,6 +1065,7 @@ function loadState() {
     TodoCore.applyImportPayload(state, parsed);
   } catch {
     localStorage.removeItem(STATE_STORAGE_KEY);
+    localStorage.removeItem(LEGACY_STATE_STORAGE_KEY);
   }
 }
 
@@ -1062,8 +1102,9 @@ function extractDateKeyFromMovedAt(movedAt) {
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
+  const bucket = getActiveBucket();
   try {
-    TodoCore.addTodo(state, input.value, { maxTodoText: MAX_TODO_TEXT, maxTodos: MAX_TODOS });
+    TodoCore.addTodo(bucket, input.value, { maxTodoText: MAX_TODO_TEXT, maxTodos: MAX_TODOS });
     input.value = "";
     render();
     saveState();
@@ -1093,9 +1134,17 @@ addTodoDialog.addEventListener("close", () => {
   stopViewportTracking();
 });
 
-toggleViewBtn.addEventListener("click", () => {
-  const isTodo = historyView.classList.contains("hidden");
-  setView(isTodo ? "history" : "todo");
+categoryTodoBtn.addEventListener("click", () => {
+  state.activeCategory = "todo";
+  render();
+});
+categoryDinnerBtn.addEventListener("click", () => {
+  state.activeCategory = "dinner";
+  render();
+});
+categoryOtherBtn.addEventListener("click", () => {
+  state.activeCategory = "other";
+  render();
 });
 moveHistoryBtn.addEventListener("click", () => {
   void moveCheckedToHistory();
@@ -1176,7 +1225,8 @@ importJsonInput.addEventListener("change", () => {
         maxHistory: MAX_HISTORY,
       });
       TodoCore.applyImportPayload(state, parsed);
-      setView("todo");
+      setView("list");
+      state.activeCategory = "todo";
       render();
       saveState();
       alert("Importしました。");
@@ -1195,6 +1245,7 @@ historyDeleteCancelBtn.addEventListener("click", () => {
 
 historyDeleteForm.addEventListener("submit", (e) => {
   e.preventDefault();
+  const bucket = getActiveBucket();
   const raw = historyCutoffInput.value.trim();
   const cutoff = parseCutoffDateKey(raw);
   if (!cutoff) {
@@ -1202,14 +1253,14 @@ historyDeleteForm.addEventListener("submit", (e) => {
     return;
   }
 
-  const beforeCount = state.history.length;
-  state.history = state.history.filter((item) => {
+  const beforeCount = bucket.history.length;
+  bucket.history = bucket.history.filter((item) => {
     const key = extractDateKeyFromMovedAt(item.movedAt);
     if (!key) return true;
     return key > cutoff;
   });
 
-  const deleted = beforeCount - state.history.length;
+  const deleted = beforeCount - bucket.history.length;
   render();
   saveState();
   historyDeleteDialog.close();
@@ -1224,6 +1275,6 @@ if (savedWallpaper) {
 installDoubleTapZoomGuard(historyView);
 loadState();
 installEdgeHistorySwipe();
-setView("todo");
+setView("list");
 render();
 window.addEventListener("resize", syncTodoVisibleMask);

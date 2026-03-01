@@ -16,8 +16,10 @@
     <div id="animation-layer" class="animation-layer" aria-hidden="true"></div>
     <main class="app-shell">
       <header class="top-bar">
-        <div class="view-switch">
-          <button id="toggle-view-btn" class="small-btn active" type="button">Todo</button>
+        <div class="category-switch">
+          <button id="category-todo-btn" class="small-btn active" type="button">Todo</button>
+          <button id="category-dinner-btn" class="small-btn" type="button">晩ご飯</button>
+          <button id="category-other-btn" class="small-btn" type="button">その他</button>
         </div>
         <div class="top-actions">
           <button id="move-history-btn" class="primary-btn" type="button">履歴へ移動</button>
@@ -67,7 +69,7 @@
             <button id="import-json-btn" type="button" class="small-btn">Import JSON</button>
           </div>
           <input id="import-json-input" type="file" accept="application/json,.json" class="hidden" />
-          <small class="format-note">形式: { "version": 1, "todos": [...], "history": [...] }</small>
+          <small class="format-note">形式: { "version": 2, "categories": { "todo": { "todos": [...], "history": [...] }, ... } }（v1もImport可）</small>
         </section>
 
         <section class="settings-section">

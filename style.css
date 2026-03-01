@@ -59,9 +59,10 @@ body {
   margin-bottom: 12px;
 }
 
-.view-switch {
+.category-switch {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .top-actions {
