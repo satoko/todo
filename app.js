@@ -715,13 +715,18 @@ function createHistoryItem(item, index) {
   li.className = "swipe-item";
 
   const actions = document.createElement("div");
-  actions.className = "swipe-actions single";
+  actions.className = "swipe-actions";
+
+  const restoreBtn = document.createElement("button");
+  restoreBtn.type = "button";
+  restoreBtn.className = "swipe-action restore";
+  restoreBtn.textContent = "戻す";
 
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
   deleteBtn.className = "swipe-action delete";
   deleteBtn.textContent = "削除";
-  actions.append(deleteBtn);
+  actions.append(restoreBtn, deleteBtn);
 
   const content = document.createElement("div");
   content.className = "swipe-content";
@@ -742,7 +747,7 @@ function createHistoryItem(item, index) {
   li.append(actions, content);
 
   const swipe = wireSwipe(content, {
-    actionWidth: 86,
+    actionWidth: SWIPE_ACTIONS_WIDTH,
     onDelete: () => {
       state.history.splice(index, 1);
       render();
@@ -755,6 +760,19 @@ function createHistoryItem(item, index) {
     state.history[index].tone = nextTone;
     render();
     saveState();
+  });
+  restoreBtn.addEventListener("click", () => {
+    const historyItem = state.history[index];
+    if (!historyItem) return;
+    try {
+      TodoCore.addTodo(state, historyItem.text, { maxTodoText: MAX_TODO_TEXT, maxTodos: MAX_TODOS });
+      state.todos[state.todos.length - 1].tone = normalizeTone(historyItem.tone);
+      state.history.splice(index, 1);
+      render();
+      saveState();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "一覧への戻しに失敗しました。");
+    }
   });
   deleteBtn.addEventListener("click", swipe.remove);
 
